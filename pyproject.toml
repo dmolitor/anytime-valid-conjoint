@@ -1,0 +1,17 @@
+[project]
+name = "anytime-valid-conjoint"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Daniel Molitor", email = "molitdj97@gmail.com" }
+]
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+anytime-valid-conjoint = "anytime_valid_conjoint:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
