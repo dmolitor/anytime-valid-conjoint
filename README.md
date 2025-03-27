@@ -4,7 +4,7 @@ What this says ☝️
 
 ## Setting up R
 
-This project uses [`renv`](https://rstudio.github.io/renv/index.html) to manage
+This project uses [renv](https://rstudio.github.io/renv/index.html) to manage
 R dependencies. To sync your local project:
 ```r
 # install.packages("renv")
@@ -14,7 +14,7 @@ renv::restore(prompt = FALSE)
 
 ## Setting up Python
 
-This project uses [`uv`](https://docs.astral.sh/uv/) to manage Python
+This project uses [uv](https://docs.astral.sh/uv/) to manage Python
 dependencies and code. To sync your local project:
 ```bash
 uv python install
