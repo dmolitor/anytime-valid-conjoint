@@ -8,7 +8,7 @@ library(here)
 library(progressr)
 library(tibble)
 
-source(here("blog/posts/conjoint_analysis/utils.R"))
+source(here("src/anytime_valid_conjoint/utils.R"))
 
 # Generate a random draw from an RCT
 rct_draw <- function(ate) {
@@ -67,21 +67,26 @@ simulate <- function(ate, n=1e3) {
 }
 
 # Plot estimates
+cat("Simulating RCT with ATE = 0 ...\n")
 sim_results <- simulate(ate = 0)
 ggplot(sim_results, aes(x = index, y = estimate, ymin = cs_lower, ymax = cs_upper, color = which)) +
   geom_line() +
   geom_linerange(alpha = 0.1) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
   coord_cartesian(ylim = c(-3, 3)) +
-  theme_minimal()
+  theme_minimal() +
+  labs(x = "Sample size (N)", y = "ATE", color = "")
+ggsave(here("figures", "rct_simulation_r.png"), width = 5, height = 4, dpi = 300)
 
 # Type 1 error simulations ----------------------------------------------------
 
+cat("Type 1 error simulations ...\n")
+n_sim <- 10
 plan(multicore)
 with_progress({
-  pb <- progressor(along = 1:1000)
+  pb <- progressor(along = 1:n_sim)
   sim_results <- bind_rows(future_lapply(
-    1:1000,
+    1:n_sim,
     function(i) {
       results <- simulate(ate = 0) |> mutate(sim = i)
       pb()
@@ -89,14 +94,16 @@ with_progress({
     },
     future.seed = TRUE
   ))
-})
+}, enable = TRUE)
 plan(sequential)
 
 # Calculate Type 1 error rate
-sim_results |>
+cat("Type 1 error rate ...\n")
+error_rates <- sim_results |>
   mutate(covered = cs_lower <= 0 & 0 <= cs_upper) |>
   group_by(sim, which) |>
-  summarize(error = !all(covered)) |>
+  summarize(error = !all(covered), .groups = "drop_last") |>
   ungroup() |>
   group_by(which) |>
   summarize(error_rate = mean(error))
+print(error_rates)

@@ -7,7 +7,15 @@ authors = [
     { name = "Daniel Molitor", email = "molitdj97@gmail.com" }
 ]
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "joblib>=1.4.2",
+    "lxml>=5.3.1",
+    "numpy>=2.2.4",
+    "pandas>=2.2.3",
+    "plotnine>=0.14.5",
+    "statsmodels>=0.14.4",
+    "tqdm>=4.67.1",
+]
 
 [project.scripts]
 anytime-valid-conjoint = "anytime_valid_conjoint:main"
