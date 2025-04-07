@@ -1,4 +1,18 @@
 library(tibble)
+library(tidyr)
+
+add_reference <- function(data, low = "conf.low", high = "conf.high") {
+  data <- data |>
+    separate(col = "contrast", into = c("contrast", "reference"), sep = " - ")
+  data <- bind_rows(
+    data,
+    data |>
+      mutate(contrast = reference) |>
+      distinct(term, contrast, .keep_all = TRUE) |>
+      mutate(across(c(estimate, {{low}}, {{high}}), ~ 0))
+  )
+  return(data)
+}
 
 # Helper functions
 projection_matrix <- function(X) {
@@ -193,21 +207,17 @@ sequential_asymptotic_cs <- function(delta, n, propensity, lambda = 100, alpha =
   
   # If sigma_hat is not provided, assume the SE is fully adjusted and set sigma_hat to 1.
   if (is.null(sigma_hat)) sigma_hat <- 1
-  
   # Use provided feature names if available; otherwise generate defaults.
   if (is.null(term)) {
     term <- if (!is.null(names(delta))) names(delta) else paste0("ATE_", seq_along(delta))
   }
-  
   # Compute the half-width (r_n) using the asymptotic formula from Theorem 6.1:
   #   r_n = sigma_hat / sqrt(n * propensity * (1 - propensity)) * sqrt(((lambda + n) / n) * log((lambda + n) / (lambda * alpha^2)))
   half_width <- sigma_hat / sqrt(n * propensity * (1 - propensity)) * 
                 sqrt(((lambda + n) / n) * log((lambda + n) / (lambda * alpha^2)))
-  
   # Construct the confidence sequence for each ATE estimate.
   cs_lower <- delta - half_width
   cs_upper <- delta + half_width
-  
   # Return a tibble with the results.
   result_df <- tibble(
     term = term,
@@ -222,6 +232,5 @@ sequential_asymptotic_cs <- function(delta, n, propensity, lambda = 100, alpha =
     alpha = alpha,
     sigma_hat = sigma_hat
   )
-  
   return(result_df)
 }
