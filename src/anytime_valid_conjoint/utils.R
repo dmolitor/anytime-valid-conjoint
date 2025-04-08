@@ -1,3 +1,4 @@
+library(dplyr)
 library(tibble)
 library(tidyr)
 
@@ -12,6 +13,32 @@ add_reference <- function(data, low = "conf.low", high = "conf.high") {
       mutate(across(c(estimate, {{low}}, {{high}}), ~ 0))
   )
   return(data)
+}
+
+# Extract marginal means from attribute AMCEs
+amces_to_mms <- function(amce_attr1, amce_attr2, intercept = 0.5) {
+  # Calculate the average effect for each attribute including the baseline (0)
+  avg_attr2 <- (0 + sum(amce_attr2)) / (length(amce_attr2) + 1)
+  avg_attr1 <- (0 + sum(amce_attr1)) / (length(amce_attr1) + 1)
+  # For attribute 1, include baseline "Level 1" with effect 0
+  attr1_levels <- c("Level 1", names(amce_attr1))
+  attr1_effects <- c(0, as.numeric(amce_attr1))
+  mm_attr1 <- intercept + attr1_effects + avg_attr2
+  mms1 <- tibble(
+    term = "attr1",
+    contrast = attr1_levels,
+    estimate_truth = mm_attr1
+  )
+  # For attribute 2, include baseline "Level 1" with effect 0
+  attr2_levels <- c("Level 1", names(amce_attr2))
+  attr2_effects <- c(0, as.numeric(amce_attr2))
+  mm_attr2 <- intercept + avg_attr1 + attr2_effects
+  mms2 <- tibble(
+    term = "attr2",
+    contrast = attr2_levels,
+    estimate_truth = mm_attr2
+  )
+  bind_rows(mms1, mms2)
 }
 
 # Helper functions
@@ -61,6 +88,28 @@ log_bf_multivariate <- function(delta, n, p, d, Phi, ZtZ, s2) {
       log(1 + t(delta) %*% (ZtZ - ZtZ %*% sol) %*% delta / (s2 * (n - p - d)))
     )
 }
+
+# Calculate the marginal mean for a specific attribute
+marginal_mean <- function(model, attribute, newdata, ...) {
+  mms <- avg_predictions(model, variables = attribute, ...)
+  jacobian <- attr(mms, "jacobian")
+  vcov <- attr(mms, "vcov")
+  mms <- mms |>
+    rename("level" = {{attribute}}) |>
+    mutate("term" = {{attribute}})
+  return(as_tibble(mms))
+}
+
+# Calculate the marginal means for a vector of attributes
+marginal_means <- function(model, attributes, newdata = "balanced", ...) {
+  mms <- lapply(
+    attributes,
+    function(attribute) marginal_mean(model, attribute, ...)
+  )
+  mmeans <- bind_rows(mms)
+  return(mmeans)
+}
+
 
 # Calculate the p-value from a sequential t-test
 # 
@@ -134,7 +183,7 @@ sequential_f_p_value <- function(delta, n, n_params, Z, phi = 1) {
   return(pval)
 }
 
-sequential_f_cs <- function(delta, se, n, n_params, Z, alpha = 0.05, phi = 1, term = NULL, contrast = NULL) {
+sequential_f_cs <- function(delta, se, n, n_params, Z = NULL, alpha = 0.05, phi = 1, term = NULL, contrast = NULL) {
   # delta: vector of estimates (e.g., marginal effects) for parameters of interest (length d)
   # se: corresponding standard errors for these estimates
   # n: total sample size
@@ -179,7 +228,7 @@ sequential_f_cs <- function(delta, se, n, n_params, Z, alpha = 0.05, phi = 1, te
   cs_upper <- delta + radii
   # Compute the multivariate sequential F-test p-value over the parameters of interest.
   # This tests the joint null that all delta = 0.
-  f_seq_p <- sequential_f_p_value(delta, n, n_params, Z, phi)
+  f_seq_p <- ifelse(!is.null(Z), sequential_f_p_value(delta, n, n_params, Z, phi), NA)
   # Construct a data frame with the results
   result_df <- tibble(
     term = term,
