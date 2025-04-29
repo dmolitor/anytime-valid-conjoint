@@ -9,163 +9,180 @@ library(progressr)
 library(readr)
 library(scales)
 
+source(here("src/anytime_valid_conjoint/simulation.R"))
 source(here("src/anytime_valid_conjoint/utils.R"))
 
-# Function to simulate a random survey participant
-simulate_profile <- function(amce_attr1, amce_attr2, intercept = 0.5) {
-  attr1_levels <- c("Level 1", names(amce_attr1))
-  attr2_levels <- c("Level 1", names(amce_attr2))
-  # Randomly sample a level for each attribute (uniformly)
-  attr1_val <- sample(attr1_levels, 1)
-  attr2_val <- sample(attr2_levels, 1)
-  # Determine the effect for attribute 1: baseline gets effect 0
-  effect1 <- if (attr1_val == "Level 1") 0 else amce_attr1[attr1_val]
-  # Determine the effect for attribute 2: baseline gets effect 0
-  effect2 <- if (attr2_val == "Level 1") 0 else amce_attr2[attr2_val]
-  # Compute the latent probability p
-  p <- intercept + effect1 + effect2
-  # Ensure that p is within [0, 1]
-  stopifnot(p >= 0 && p <= 1)
-  # Simulate the binary outcome using p as the success probability.
-  outcome <- rbinom(1, size = 1, prob = p)
-  return(tibble(
-    attr1 = attr1_val,
-    attr2 = attr2_val,
-    outcome = outcome,
-    p = p
-  ))
-}
+options(future.globals.maxSize = Inf)
 
 # Specify the attribute-level AMCEs for attribute 1 & 2
-amce_attr1 <- c("Level 2" = 0.15, "Level 3" = 0.05, "Level 4" = -0.2)
-amce_attr2 <- c("Level 2" = 0.1, "Level 3" = 0.2, "Level 4" = -0.05)
-
-simulate <- function(n = 1000, n_warmup = 100, parallel = TRUE) {
-  # "Gather" survey responses before estimating
-  sim_data <- bind_rows(lapply(1:n, \(i) simulate_profile(amce_attr1, amce_attr2, 0.3)))
-  # Initialize tibble to collect our AMCE estimates
-  if (parallel) plan(multicore)
-  sim_estimates <- future_lapply(
-    n_warmup:n,
-    function(i) {
-      sim_model <- glm(
-        outcome ~ attr1 + attr2,
-        data = sim_data[1:i, , drop = FALSE],
-        family = "binomial"
-      )
-      # Calculate marginal effects
-      marginal_eff_sim <- avg_slopes(sim_model)
-      # Calculate sequential p-values and CSs
-      marginal_eff_sim_seq <- sequential_f_cs(
-        delta = marginal_eff_sim$estimate,
-        se = marginal_eff_sim$std.error,
-        n = i,
-        n_params = length(sim_model$coefficients),
-        Z = solve(get_vcov(marginal_eff_sim)),
-        term = marginal_eff_sim$term,
-        contrast = marginal_eff_sim$contrast
-      ) |>
-        add_reference(low = "cs_lower", high = "cs_upper") |>
-        mutate(iter = i)
-      return(marginal_eff_sim_seq)
-    },
-    future.seed = TRUE
-  )
-  plan(sequential)
-  sim_estimates <- bind_rows(sim_estimates)
-  return(sim_estimates)
-}
-
-simulate_mm <- function(n = 1000, n_warmup = 100, parallel = TRUE) {
-  # "Gather" survey responses before estimating
-  sim_data <- bind_rows(lapply(1:n, \(i) simulate_profile(amce_attr1, amce_attr2, 0.3)))
-  # Initialize tibble to collect our AMCE estimates
-  if (parallel) plan(multicore)
-  sim_estimates <- future_lapply(
-    n_warmup:n,
-    function(i) {
-      sim_model <- glm(
-        outcome ~ attr1 + attr2,
-        data = sim_data[1:i, , drop = FALSE],
-        family = "binomial"
-      )
-      # Calculate marginal means
-      mmeans <- marginal_means(sim_model, c("attr1", "attr2"))
-      # Calculate sequential p-values and CSs
-      mm_sim_seq <- sequential_f_cs(
-        delta = mmeans$estimate,
-        se = mmeans$std.error,
-        n = i,
-        n_params = length(mmeans$estimate),
-        Z = NULL,
-        term = mmeans$term
-      ) |>
-        mutate(iter = i, contrast = mmeans$level)
-      return(mm_sim_seq)
-    },
-    future.seed = TRUE
-  )
-  plan(sequential)
-  sim_estimates <- bind_rows(sim_estimates)
-  return(sim_estimates)
-}
+attr_party <- c("Left" = 0.1)
+attr_region <- c("South" = -0.01, "East" = -0.075, "West" = 0.05)
 
 ## Simulate conjoint experiment -- estimating AMCEs
 
-conjoint_sim <- simulate()
+conjoint_sim <- simulate(
+  levels = list(
+    party = c("Right", "Left"),
+    region = c("North", "South", "East", "West")
+  ),
+  amce_fn = !!expr(
+    !!attr_region[["South"]] * (region == "South") +
+    !!attr_region[["East"]] * (region == "East") +
+    !!attr_region[["West"]] * (region == "West") +
+    !!attr_party[["Left"]] * (party == "Left")
+  ),
+  formula = outcome ~ region + party,
+  n = 5000,
+  skip = 30,
+  parallel = TRUE
+)
 
 truth <- bind_rows(
   mutate(
-    as_tibble(data.frame("estimate_truth" = amce_attr1), rownames = "contrast"),
-    "term" = "attr1",
+    as_tibble(data.frame("estimate_truth" = attr_party), rownames = "contrast"),
+    "term" = "party",
     .before = 0
   ),
   mutate(
-    as_tibble(data.frame("estimate_truth" = amce_attr2), rownames = "contrast"),
-    "term" = "attr2",
+    as_tibble(data.frame("estimate_truth" = attr_region), rownames = "contrast"),
+    "term" = "region",
     .before = 0
   )
 )
 
-# coverage <- left_join(sim_estimates, truth, by = c("term", "contrast")) |>
-#   filter(!is.na(estimate_truth)) |>
-#   mutate(covered = estimate_truth >= cs_lower & estimate_truth <= cs_upper) |>
-#   summarize(error = !all(covered), .by = c(term, contrast, reference))
-
-ggplot(
+amce_sim_plot <- ggplot(
     conjoint_sim |> 
       left_join(truth, by = c("term", "contrast")) |>
       filter(!is.na(estimate_truth)) |>
-      mutate(term = case_when(term == "attr1" ~ "Attribute 1", TRUE ~ "Attribute 2")),
+      mutate(
+        term = case_when(term == "party" ~ "Party", term == "region" ~ "Region", TRUE ~ term),
+        contrast_x_term = paste0(term, ": ", contrast)
+      ) |>
+      group_by(term, contrast, estimate_truth) |>
+      arrange(iter, .by_group = TRUE) |>
+      mutate(
+        stat_sig = 0 < cs_lower | 0 > cs_upper,
+        early_stop = if (any(stat_sig)) {
+          min(iter[stat_sig])
+        } else {
+          NA
+        }
+      ),
     aes(x = iter, y = estimate, ymin = cs_lower, ymax = cs_upper)
   ) +
   geom_hline(aes(yintercept = estimate_truth), linetype = "dashed", color = "red") +
   geom_hline(yintercept = 0, linetype = "dotted") +
+  geom_vline(aes(xintercept = early_stop), linetype = "dashed", color = "blue") +
   geom_line() +
   geom_ribbon(alpha = 0.3) +
-  facet_wrap(~ term + contrast, nrow = 2) +
+  facet_wrap(
+    ~ contrast_x_term,
+    nrow = 2
+  ) +
+  coord_cartesian(ylim = c(-.25, .25)) +
   theme_minimal() +
   theme(
     panel.grid.minor = element_blank(),
     panel.grid.major = element_line(color = "gray90")
   ) +
-  labs(x = "N", y = "AMCE")
+  labs(x = "N Respondents", y = "AMCE")
 
-ggsave(here("figures", "amce_simulation.png"), width = 6, height = 5, dpi = 500)
+ggsave(
+  here("figures", "amce_simulation.png"),
+  plot = amce_sim_plot,
+  width = 6,
+  height = 4,
+  dpi = 500
+)
 
-## Simulate conjoint experiment -- estimating marginal means
+## Simulate conjoint experiment -- estimating marginal means ------------------
 
-conjoint_sim_mm <- simulate_mm()
-truth_mm <- amces_to_mms(amce_attr1, amce_attr2, intercept = 0.3)
+conjoint_sim_mm <- simulate_mm(
+  levels = list(
+    party = c("Right", "Left"),
+    region = c("North", "South", "East", "West")
+  ),
+  amce_fn = !!expr(
+    !!attr_region[["South"]] * (region == "South") +
+    !!attr_region[["East"]] * (region == "East") +
+    !!attr_region[["West"]] * (region == "West") +
+    !!attr_party[["Left"]] * (party == "Left")
+  ),
+  formula = outcome ~ region + party,
+  n = 5000,
+  skip = 30,
+  parallel = TRUE
+)
 
-ggplot(
+# Calculate true marginal means
+compute_marginal_means <- function(coefs, target) {
+  # coefs: named list of numeric vectors (each vector’s names are its levels)
+  # target: the name of one element in coefs whose marginal means you want
+  stopifnot(target %in% names(coefs))
+  # 1) win‐probability for U1–U2 difference
+  g <- function(d) {
+    res <- d + 0.5 - 0.5 * d^2
+    res[d <= -1] <- 0
+    res[d >=  1] <- 1
+    res
+  }
+  # 2) competitor utility combos
+  comp_grid <- expand.grid(
+    lapply(coefs, names),
+    stringsAsFactors = FALSE
+  )
+  comp_mat  <- sapply(names(coefs), function(a) coefs[[a]][ comp_grid[[a]] ])
+  comp_vals <- rowSums(comp_mat)
+  # 3) focal “other‐attributes” combos
+  others     <- setdiff(names(coefs), target)
+  if (length(others)>0) {
+    focal_grid <- expand.grid(
+      lapply(coefs[others], names),
+      stringsAsFactors = FALSE
+    )
+    focal_mat  <- do.call(
+      cbind,
+      lapply(others, function(a) coefs[[a]][ focal_grid[[a]] ])
+    )
+  } else {
+    focal_mat <- matrix(0, nrow = 1, ncol = 1)
+  }
+  # 4) for each level of target, compute E[Y|target=lev]
+  levels_t   <- names(coefs[[target]])
+  mm         <- numeric(length(levels_t))
+  for (i in seq_along(levels_t)) {
+    lev    <- levels_t[i]
+    s_f    <- coefs[[target]][lev] + rowSums(focal_mat)
+    p_f    <- vapply(s_f, function(sf) mean(g(sf - comp_vals)), numeric(1))
+    mm[i]  <- mean(p_f)
+  }
+  tibble(contrast = levels_t, estimate_truth = mm)
+}
+
+truth_mm <- bind_rows(
+  lapply(
+    c("region", "party"),
+    function(term) {
+      compute_marginal_means(
+        list(
+          region = c("North" = 0, attr_region),
+          party = c("Right" = 0, attr_party)
+        ),
+        term
+      ) |>
+      mutate(term = term)
+    }
+  )
+)
+
+# Plot it!
+mm_sim_plot <- ggplot(
   conjoint_sim_mm |> 
     left_join(truth_mm, by = c("term", "contrast")) |>
-    mutate(term = case_when(term == "attr1" ~ "Attribute 1", TRUE ~ "Attribute 2")),
+    mutate(term = case_when(term == "party" ~ "Party", term == "region" ~ "Region", TRUE ~ term)),
   aes(x = iter, y = estimate, ymin = cs_lower, ymax = cs_upper)
 ) +
   geom_hline(aes(yintercept = estimate_truth), linetype = "dashed", color = "red") +
-  geom_hline(yintercept = 0, linetype = "dotted") +
   geom_line() +
   geom_ribbon(alpha = 0.3) +
   facet_wrap(~ term + contrast, nrow = 2) +
@@ -176,59 +193,143 @@ ggplot(
   ) +
   labs(x = "N", y = "Marginal Means")
 
-ggsave(here("figures", "mm_simulation.png"), width = 6, height = 5, dpi = 500)
+ggsave(
+  here("figures", "mm_simulation.png"),
+  plot = mm_sim_plot,
+  width = 6,
+  height = 5
+)
 
-## Coverage simulation
+# Coverage error simulation; AMCEs and MMs ------------------------------------
 
 n_sim <- 1000
-
+plan(multicore)
 coverage_sim <- bind_rows(
   with_progress({
     pb <- progressor(along = 1:n_sim)
-    lapply(
+    future_lapply(
       1:n_sim,
       function(i) {
-        sim_results <- simulate() |> mutate(sim_iter = i)
+        sim_results <- simulate(
+          levels = list(
+            party = c("Right", "Left"),
+            region = c("North", "South", "East", "West")
+          ),
+          amce_fn = !!expr(
+            !!attr_region[["South"]] * (region == "South") +
+            !!attr_region[["East"]] * (region == "East") +
+            !!attr_region[["West"]] * (region == "West") +
+            !!attr_party[["Left"]] * (party == "Left")
+          ),
+          formula = outcome ~ region + party,
+          n = 5000,
+          skip = 30,
+          parallel = FALSE
+        )
+        sim_results <- sim_results |> mutate(sim_iter = i)
+        pb()
+        return(sim_results)
+      },
+      future.seed = TRUE,
+      future.globals = list(attr_region = attr_region)
+    )
+  })
+)
+
+coverage_sim_mm <- bind_rows(
+  with_progress({
+    pb <- progressor(along = 1:n_sim)
+    future_lapply(
+      1:n_sim,
+      function(i) {
+        sim_results <- simulate_mm(
+          levels = list(
+            party = c("Right", "Left"),
+            region = c("North", "South", "East", "West")
+          ),
+          amce_fn = !!expr(
+            !!attr_region[["South"]] * (region == "South") +
+            !!attr_region[["East"]] * (region == "East") +
+            !!attr_region[["West"]] * (region == "West") +
+            !!attr_party[["Left"]] * (party == "Left")
+          ),
+          formula = outcome ~ region + party,
+          n = 5000,
+          skip = 30,
+          parallel = FALSE
+        )
+        sim_results <- sim_results |> mutate(sim_iter = i)
         pb()
         return(sim_results)
       }
     )
   })
 )
+plan(sequential)
 
-coverage_sim_df <- left_join(coverage_sim, truth, by = c("term", "contrast")) |>
-  filter(!is.na(estimate_truth))
-write_csv(coverage_sim_df, here("tables", "coverage_sim.csv"))
+coverage_sim_amce_df <- left_join(coverage_sim, truth, by = c("term", "contrast")) |>
+  filter(!is.na(estimate_truth)) |>
+  mutate(which = "AMCE")
+coverage_sim_mm_df <- left_join(coverage_sim_mm, truth_mm, by = c("term", "contrast")) |>
+  filter(!is.na(estimate_truth)) |>
+  mutate(which = "Marginal Mean")
+coverage_sim_df <- bind_rows(coverage_sim_amce_df, coverage_sim_mm_df)
+write_csv(coverage_sim_df, here("data", "coverage_sim.csv"))
 
 error_rates <- coverage_sim_df |>
   mutate(covered = estimate_truth >= cs_lower & estimate_truth <= cs_upper) |>
   summarize(
     error = !all(covered),
-    .by = c(sim_iter, term, contrast, reference)
+    .by = c(sim_iter, term, contrast, reference, which)
   ) |>
   summarize(
     error_rate = mean(error),
     error_rate_se = sd(error)/sqrt(n_sim),
-    .by = c(term, contrast, reference)
+    .by = c(term, contrast, reference, which)
   )
 print(error_rates)
 
 alpha <- 0.05
-error_rates |>
-  mutate(
-    term = case_when(term == "attr1" ~ "Attribute 1", TRUE ~ "Attribute 2"),
-    label = paste0(term, " - ", contrast),
-    upper = error_rate + qnorm(1-alpha/2)*error_rate_se,
-    lower = error_rate - qnorm(1-alpha/2)*error_rate_se
-  ) |>
-  ggplot(aes(x = label, y = error_rate, ymin = lower, ymax = upper)) +
-  geom_point() +
-  geom_linerange() +
-  geom_hline(yintercept = alpha, linetype = "dashed", color = "red") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 90)) +
-  coord_cartesian(ylim = c(0, 0.1)) +
-  scale_y_continuous(labels = percent) +
-  labs(x = "", y = "Coverage error rate")
+plot_coverage <- function(error_rates, var = "both") {
+  if (var != "both") {
+    error_rates <- error_rates |> filter(which == var)
+  }
+  coverage_error_plot <- error_rates |>
+    mutate(
+      term = case_when(
+        term == "party" ~ "Party",
+        term == "region" ~ "Region",
+        TRUE ~ term
+      ),
+      label = paste0(term, " - ", contrast),
+      upper = error_rate + qnorm(1-alpha/2)*error_rate_se,
+      lower = error_rate - qnorm(1-alpha/2)*error_rate_se
+    ) |>
+    ggplot(aes(
+      x = label,
+      y = error_rate,
+      ymin = lower,
+      ymax = upper,
+      color = if (var == "both") which else NULL
+    )) +
+    geom_point(position = position_dodge(width = 0.25)) +
+    geom_linerange(position = position_dodge(width = 0.25)) +
+    geom_hline(yintercept = alpha, linetype = "dashed", color = "red") +
+    theme_minimal() +
+    coord_flip() +
+    scale_y_continuous(
+      labels = percent,
+      limits = c(0, 0.075),
+      breaks = seq(0, 0.075, length.out = 4)
+    ) +
+    labs(x = "", y = "Coverage error rate", color = "")
+  return(coverage_error_plot)
+}
+coverage_error_plot_amce <- plot_coverage(error_rates, "AMCE")
 
-ggsave(here("figures", "amce_coverage_error.png"), width = 5, height = 5, dpi = 500)
+ggsave(
+  here("figures", "coverage_error_rates_amce.png"),
+  plot = coverage_error_plot_amce,
+  width = 4,
+  height = 2
+)

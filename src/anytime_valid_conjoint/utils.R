@@ -110,6 +110,17 @@ marginal_means <- function(model, attributes, newdata = "balanced", ...) {
   return(mmeans)
 }
 
+# Retry an expression N times
+retry <- function(expr, n = 3, silent = TRUE) {
+  expr_sub <- substitute(expr)
+  for (i in seq_len(n)) {
+    result <- try(eval(expr_sub, envir = parent.frame()), silent = silent)
+    if (!inherits(result, "try-error")) {
+      return(result)
+    }
+  }
+  stop(sprintf("Expression failed after %d attempts.", n))
+}
 
 # Calculate the p-value from a sequential t-test
 # 
