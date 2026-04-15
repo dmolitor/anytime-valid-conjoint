@@ -14,3 +14,6 @@ wheels/
 # renv stuff
 renv/
 .Rprofile
+
+# Ignore /resources (where I may store Claude-related things)
+resources/
