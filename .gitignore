@@ -17,3 +17,6 @@ renv/
 
 # Ignore /resources (where I may store Claude-related things)
 resources/
+
+# Replication outputs
+log.txt
