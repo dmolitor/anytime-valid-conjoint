@@ -1,6 +1,8 @@
-library(here)
-library(readr)
-library(cjpowR)
+suppressPackageStartupMessages({
+  library(here)
+  library(readr)
+  library(cjpowR)
+})
 
 source(here("code", "cj.R"))
 
@@ -14,7 +16,7 @@ significance_level <- 0.05
 target_power <- 0.8
 tasks_per_respondent <- 1
 target_levels <- 6
-number_of_simulations <- 1000
+number_of_simulations <- 100#0
 
 # amce_grid <- seq(0.01, 0.05, length.out = 9); # Run this if you want a full grid of target AMCE values
 amce_grid <- 0.03
@@ -26,7 +28,6 @@ set.seed(641423)
 power <- lapply(
   amce_grid,
   function(amce) {
-    cat("AMCE:", amce, "\n")
     true_amces <- ratio_grid*amce
     regions <- setNames(true_amces, paste("Region", 1:length(true_amces)))
     amces <- list(

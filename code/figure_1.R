@@ -1,6 +1,8 @@
-library(here)
-library(ggplot2)
-library(readr)
+suppressPackageStartupMessages({
+  library(here)
+  library(ggplot2)
+  library(readr)
+})
 
 source(here("code", "cj.R"))
 
@@ -35,20 +37,22 @@ cj <- ConjointSim$new(
 )
 # Simulate the conjoint
 set.seed(163373)
-cj$simulate_conjoint(
+out <- cj$simulate_conjoint(
   alpha = significance_level,
   experiment_size = number_of_respondents,
   chunk_size = 100
 )
 
 # Plot Figure 1
-p <- cj$plot_estimates(TRUE, show_when_stat_sig = TRUE) +
-  labs(x = "Sample size", y = "AMCE")
-# Save the results
-ggsave(
-  here("figures", "figure1.png"),
-  plot = p,
-  width = 6,
-  height = 4,
-  dpi = 500
-)
+suppressWarnings({
+  p <- cj$plot_estimates(TRUE, show_when_stat_sig = TRUE) +
+    labs(x = "Sample size", y = "AMCE")
+  # Save the results
+  ggsave(
+    here("figures", "figure1.png"),
+    plot = p,
+    width = 6,
+    height = 4,
+    dpi = 500
+  )
+})

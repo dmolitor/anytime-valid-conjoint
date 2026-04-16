@@ -1,10 +1,12 @@
-library(ggplot2)
-library(here)
-library(readr)
-library(scales)
-library(dplyr)
+suppressPackageStartupMessages({
+  library(ggplot2)
+  library(here)
+  library(readr)
+  library(scales)
+  library(dplyr)
+})
 
-power_df <- read_csv(here("data", "figure4.csv"))
+power_df <- read_csv(here("data", "figure4.csv"), show_col_types = FALSE)
 
 power_df <- power_df |>
   filter(attribute == "Region") |>
@@ -46,39 +48,43 @@ power_df <- power_df |>
 
 # Plot it
 
-efficiency_plot <- ggplot(
-  power_df,
-  aes(
-    x = overshoot_ratio,
-    y = pct_sample_save,
-    ymin = pct_sample_save_lb,
-    ymax = pct_sample_save_ub
-  )
-) +
-  geom_ribbon(alpha = 0.25) +
-  geom_line(linewidth = 0.3) +
-  geom_point(size = 1) +
-  scale_y_continuous(
-    labels = scales::percent_format(accuracy = 1)
-  ) +
-  scale_x_continuous(breaks = seq(1.25, 3, by = 0.25)) +
-  labs(
-    x = "True AMCE \u00F7 Powered-for AMCE",
-    y = "Mean sample savings"
-  ) +
-  theme_minimal(base_size = 11) +
-  theme(
-    legend.position = "none",
-    panel.grid.minor = element_blank()
-  )
+suppressWarnings({
 
-ggsave(
-  here("figures", "figure4.png"),
-  plot = efficiency_plot,
-  dpi = 500,
-  width = 5,
-  height = 3
-)
+  efficiency_plot <- ggplot(
+    power_df,
+    aes(
+      x = overshoot_ratio,
+      y = pct_sample_save,
+      ymin = pct_sample_save_lb,
+      ymax = pct_sample_save_ub
+    )
+  ) +
+    geom_ribbon(alpha = 0.25) +
+    geom_line(linewidth = 0.3) +
+    geom_point(size = 1) +
+    scale_y_continuous(
+      labels = scales::percent_format(accuracy = 1)
+    ) +
+    scale_x_continuous(breaks = seq(1.25, 3, by = 0.25)) +
+    labs(
+      x = "True AMCE \u00F7 Powered-for AMCE",
+      y = "Mean sample savings"
+    ) +
+    theme_minimal(base_size = 11) +
+    theme(
+      legend.position = "none",
+      panel.grid.minor = element_blank()
+    )
+
+  # ggsave(
+  #   here("figures", "figure4.png"),
+  #   plot = efficiency_plot,
+  #   dpi = 500,
+  #   width = 5,
+  #   height = 3
+  # )
+
+})
 
 # If you want to plot the power -----
 

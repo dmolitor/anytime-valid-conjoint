@@ -1,116 +1,123 @@
-library(ggplot2)
-library(ggtext)
-library(grid)
-library(gridExtra)
-library(fst)
-library(glue)
-library(scales)
-library(viridis)
-library(patchwork)
-library(here)
-library(dplyr)
+suppressPackageStartupMessages({
+  library(ggplot2)
+  library(ggtext)
+  library(grid)
+  library(gridExtra)
+  library(fst)
+  library(glue)
+  library(scales)
+  library(viridis)
+  library(patchwork)
+  library(here)
+  library(dplyr)
+})
 
-sample_efficiency_df <- read_fst(here("data", "figure_3_6_efficiency.fst")) |>
-  as_tibble()
+sample_efficiency_df <- suppressMessages({
+  read_fst(here("data", "figure_3_6_efficiency.fst"))
+}) |> as_tibble()
 
 ## Appendix Figure 3 ----------------------------------------------------------
 
-# Plot mean sample size savings induced by early stopping
+suppressWarnings({
 
-early_stopping_sample_plot <- ggplot(
+  # Plot mean sample size savings induced by early stopping
+
+  early_stopping_sample_plot <- ggplot(
+      sample_efficiency_df,
+      aes(
+        x = amce,
+        y = p_sample_save,
+        ymin = p_sample_save_lb,
+        ymax = p_sample_save_ub,
+        color = N
+      )
+    ) +
+    geom_line(linewidth = 0.5, alpha = 0.3) +
+    geom_linerange(alpha = 0.3) +
+    geom_point(alpha = 0.3, size = 0.6) +
+    geom_smooth(
+      formula = y ~ x,
+      method = "loess",
+      se = FALSE,
+      linewidth = 0.3,
+      span = 0.4
+    ) +
+    facet_wrap(~ n_lev, ncol = 1) +
+    scale_x_continuous(
+      breaks = seq(0.02, 0.12, length.out = 6),
+      labels = function(x) {
+        x <- round(x, 3)
+        x <- format(x, trim = TRUE, scientific = FALSE)
+        sub("^(-?)0\\.", "\\1.", x)
+      }
+    ) +
+    scale_y_continuous(labels = percent, limits = c(0, 1)) +
+    labs(
+      x = "AMCE",
+      y = "Mean sample saved (%)",
+      color = ""
+    ) +
+    theme_minimal() +
+    scale_color_viridis(discrete = TRUE) +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+  # Plot probability of early stopping by AMCE (effect size)
+
+  early_stopping_pr_plot <- ggplot(
     sample_efficiency_df,
     aes(
       x = amce,
-      y = p_sample_save,
-      ymin = p_sample_save_lb,
-      ymax = p_sample_save_ub,
+      y = p_early,
+      ymin = p_early_lb,
+      ymax = p_early_ub,
       color = N
     )
   ) +
-  geom_line(linewidth = 0.5, alpha = 0.3) +
-  geom_linerange(alpha = 0.3) +
-  geom_point(alpha = 0.3, size = 0.6) +
-  geom_smooth(
-    formula = y ~ x,
-    method = "loess",
-    se = FALSE,
-    linewidth = 0.3,
-    span = 0.4
-  ) +
-  facet_wrap(~ n_lev, ncol = 1) +
-  scale_x_continuous(
-    breaks = seq(0.02, 0.12, length.out = 6),
-    labels = function(x) {
-      x <- round(x, 3)
-      x <- format(x, trim = TRUE, scientific = FALSE)
-      sub("^(-?)0\\.", "\\1.", x)
-    }
-  ) +
-  scale_y_continuous(labels = percent, limits = c(0, 1)) +
-  labs(
-    x = "AMCE",
-    y = "Mean sample saved (%)",
-    color = ""
-  ) +
-  theme_minimal() +
-  scale_color_viridis(discrete = TRUE) +
-  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+    geom_point(alpha = 0.3, size = 0.6) +
+    geom_line(linewidth = 0.5, alpha = 0.3) +
+    geom_linerange(alpha = 0.3) +
+    geom_smooth(
+      formula = y ~ x,
+      method = "loess",
+      se = FALSE,
+      linewidth = 0.3,
+      span = 0.4
+    ) +
+    facet_wrap(~ n_lev, ncol = 1) +
+    scale_x_continuous(
+      breaks = seq(0.02, 0.12, length.out = 6),
+      labels = function(x) {
+        x <- round(x, 3)
+        x <- format(x, trim = TRUE, scientific = FALSE)
+        sub("^(-?)0\\.", "\\1.", x)
+      }
+    ) +
+    labs(
+      x = "AMCE",
+      y = "**Pr(** Early Stopping **)**"
+    ) +
+    theme_minimal() +
+    scale_color_viridis(discrete = TRUE) +
+    guides(color = "none") +
+    theme(
+      axis.title.y = element_markdown(),
+      plot.title = element_text(hjust = 0.5, face = "bold")
+    )
 
-# Plot probability of early stopping by AMCE (effect size)
+  sample_efficiency_plot <- early_stopping_pr_plot +
+    early_stopping_sample_plot +
+    plot_layout(ncol = 2, guides = "collect") &
+    theme(legend.position = "bottom")
 
-early_stopping_pr_plot <- ggplot(
-  sample_efficiency_df,
-  aes(
-    x = amce,
-    y = p_early,
-    ymin = p_early_lb,
-    ymax = p_early_ub,
-    color = N
-  )
-) +
-  geom_point(alpha = 0.3, size = 0.6) +
-  geom_line(linewidth = 0.5, alpha = 0.3) +
-  geom_linerange(alpha = 0.3) +
-  geom_smooth(
-    formula = y ~ x,
-    method = "loess",
-    se = FALSE,
-    linewidth = 0.3,
-    span = 0.4
-  ) +
-  facet_wrap(~ n_lev, ncol = 1) +
-  scale_x_continuous(
-    breaks = seq(0.02, 0.12, length.out = 6),
-    labels = function(x) {
-      x <- round(x, 3)
-      x <- format(x, trim = TRUE, scientific = FALSE)
-      sub("^(-?)0\\.", "\\1.", x)
-    }
-  ) +
-  labs(
-    x = "AMCE",
-    y = "**Pr(** Early Stopping **)**"
-  ) +
-  theme_minimal() +
-  scale_color_viridis(discrete = TRUE) +
-  guides(color = "none") +
-  theme(
-    axis.title.y = element_markdown(),
-    plot.title = element_text(hjust = 0.5, face = "bold")
-  )
+  # ggsave(
+  #   here("figures", "figure6.png"),
+  #   plot = sample_efficiency_plot,
+  #   dpi = 500,
+  #   width = 8,
+  #   height = 8
+  # )
 
-sample_efficiency_plot <- early_stopping_pr_plot +
-  early_stopping_sample_plot +
-  plot_layout(ncol = 2, guides = "collect") &
-  theme(legend.position = "bottom")
-
-ggsave(
-  here("figures", "figure6.png"),
-  plot = sample_efficiency_plot,
-  dpi = 500,
-  width = 8,
-  height = 8
-)
+})
 
 ## Figure 3 -------------------------------------------------------------------
 
@@ -141,138 +148,140 @@ annot_label_save <- glue(
   "(about N = {comma(annot_n_save)})"
 )
 
-sample_efficiency_sample_plot <- ggplot(
+suppressWarnings({
+  sample_efficiency_sample_plot <- ggplot(
+      sample_efficiency_df |> filter(n_lev == "Attribute levels: 6"),
+      aes(
+        x = amce,
+        y = p_sample_save,
+        ymin = p_sample_save_lb,
+        ymax = p_sample_save_ub,
+        color = N
+      )
+    ) +
+    geom_line(linewidth = 0.5, alpha = 0.3) +
+    geom_linerange(alpha = 0.3) +
+    geom_point(alpha = 0.3, size = 0.6) +
+    geom_smooth(
+      formula = y ~ x,
+      method = "loess",
+      se = FALSE,
+      linewidth = 0.3,
+      span = 0.4
+    ) +
+    geom_curve(
+      data = annot_df,
+      aes(
+        x = 0.063, y = 0.18,
+        xend = amce, yend = p_sample_save
+      ),
+      inherit.aes = FALSE,
+      curvature = -0.25,
+      arrow = arrow(length = unit(0.015, "npc")),
+      linewidth = 0.4,
+      color = "black"
+    ) +
+    annotate(
+      "text",
+      x = 0.0632,
+      y = 0.16,
+      label = annot_label_save,
+      hjust = 0,
+      vjust = 1,
+      size = 3
+    ) +
+    scale_x_continuous(
+      breaks = seq(0.02, 0.12, length.out = 6),
+      labels = function(x) {
+        x <- round(x, 3)
+        x <- format(x, trim = TRUE, scientific = FALSE)
+        sub("^(-?)0\\.", "\\1.", x)
+      }
+    ) +
+    scale_y_continuous(labels = percent, limits = c(0, 1)) +
+    labs(
+      x = "AMCE",
+      y = "Mean sample saved (%)",
+      color = ""
+    ) +
+    theme_minimal() +
+    scale_color_viridis(discrete = TRUE) +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+  sample_efficiency_pr_plot <- ggplot(
     sample_efficiency_df |> filter(n_lev == "Attribute levels: 6"),
     aes(
       x = amce,
-      y = p_sample_save,
-      ymin = p_sample_save_lb,
-      ymax = p_sample_save_ub,
+      y = p_early,
+      ymin = p_early_lb,
+      ymax = p_early_ub,
       color = N
     )
   ) +
-  geom_line(linewidth = 0.5, alpha = 0.3) +
-  geom_linerange(alpha = 0.3) +
-  geom_point(alpha = 0.3, size = 0.6) +
-  geom_smooth(
-    formula = y ~ x,
-    method = "loess",
-    se = FALSE,
-    linewidth = 0.3,
-    span = 0.4
-  ) +
-  geom_curve(
-    data = annot_df,
-    aes(
-      x = 0.063, y = 0.18,
-      xend = amce, yend = p_sample_save
-    ),
-    inherit.aes = FALSE,
-    curvature = -0.25,
-    arrow = arrow(length = unit(0.015, "npc")),
-    linewidth = 0.4,
-    color = "black"
-  ) +
-  annotate(
-    "text",
-    x = 0.0632,
-    y = 0.16,
-    label = annot_label_save,
-    hjust = 0,
-    vjust = 1,
-    size = 3
-  ) +
-  scale_x_continuous(
-    breaks = seq(0.02, 0.12, length.out = 6),
-    labels = function(x) {
-      x <- round(x, 3)
-      x <- format(x, trim = TRUE, scientific = FALSE)
-      sub("^(-?)0\\.", "\\1.", x)
-    }
-  ) +
-  scale_y_continuous(labels = percent, limits = c(0, 1)) +
-  labs(
-    x = "AMCE",
-    y = "Mean sample saved (%)",
-    color = ""
-  ) +
-  theme_minimal() +
-  scale_color_viridis(discrete = TRUE) +
-  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+    geom_point(alpha = 0.3, size = 0.6) +
+    geom_line(linewidth = 0.5, alpha = 0.3) +
+    geom_linerange(alpha = 0.3) +
+    geom_smooth(
+      formula = y ~ x,
+      method = "loess",
+      se = FALSE,
+      linewidth = 0.3,
+      span = 0.4
+    ) +
+    geom_curve(
+      data = annot_df,
+      aes(
+        x = 0.065, y = 0.30,
+        xend = amce, yend = p_early
+      ),
+      inherit.aes = FALSE,
+      curvature = -0.25,
+      arrow = arrow(length = unit(0.015, "npc")),
+      linewidth = 0.4,
+      color = "black"
+    ) +
+    annotate(
+      "text",
+      x = 0.067,
+      y = 0.28,
+      label = annot_label_early,
+      hjust = 0,
+      vjust = 1,
+      size = 3
+    ) +
+    scale_x_continuous(
+      breaks = seq(0.02, 0.12, length.out = 6),
+      labels = function(x) {
+        x <- round(x, 3)
+        x <- format(x, trim = TRUE, scientific = FALSE)
+        sub("^(-?)0\\.", "\\1.", x)
+      }
+    ) +
+    labs(
+      x = "AMCE",
+      y = "**Pr(** Early Stopping **)**"
+    ) +
+    theme_minimal() +
+    scale_color_viridis(discrete = TRUE) +
+    guides(color = "none") +
+    theme(
+      axis.title.y = element_markdown(),
+      plot.title = element_text(hjust = 0.5, face = "bold")
+    )
 
-sample_efficiency_pr_plot <- ggplot(
-  sample_efficiency_df |> filter(n_lev == "Attribute levels: 6"),
-  aes(
-    x = amce,
-    y = p_early,
-    ymin = p_early_lb,
-    ymax = p_early_ub,
-    color = N
-  )
-) +
-  geom_point(alpha = 0.3, size = 0.6) +
-  geom_line(linewidth = 0.5, alpha = 0.3) +
-  geom_linerange(alpha = 0.3) +
-  geom_smooth(
-    formula = y ~ x,
-    method = "loess",
-    se = FALSE,
-    linewidth = 0.3,
-    span = 0.4
-  ) +
-  geom_curve(
-    data = annot_df,
-    aes(
-      x = 0.065, y = 0.30,
-      xend = amce, yend = p_early
-    ),
-    inherit.aes = FALSE,
-    curvature = -0.25,
-    arrow = arrow(length = unit(0.015, "npc")),
-    linewidth = 0.4,
-    color = "black"
-  ) +
-  annotate(
-    "text",
-    x = 0.067,
-    y = 0.28,
-    label = annot_label_early,
-    hjust = 0,
-    vjust = 1,
-    size = 3
-  ) +
-  scale_x_continuous(
-    breaks = seq(0.02, 0.12, length.out = 6),
-    labels = function(x) {
-      x <- round(x, 3)
-      x <- format(x, trim = TRUE, scientific = FALSE)
-      sub("^(-?)0\\.", "\\1.", x)
-    }
-  ) +
-  labs(
-    x = "AMCE",
-    y = "**Pr(** Early Stopping **)**"
-  ) +
-  theme_minimal() +
-  scale_color_viridis(discrete = TRUE) +
-  guides(color = "none") +
-  theme(
-    axis.title.y = element_markdown(),
-    plot.title = element_text(hjust = 0.5, face = "bold")
-  )
+  sample_efficiency_plot <- sample_efficiency_pr_plot +
+    sample_efficiency_sample_plot +
+    plot_layout(ncol = 2, guides = "collect") &
+    theme(legend.position = "bottom")
 
-sample_efficiency_plot <- sample_efficiency_pr_plot +
-  sample_efficiency_sample_plot +
-  plot_layout(ncol = 2, guides = "collect") &
-  theme(legend.position = "bottom")
-
-ggsave(
-  here("figures", "figure3.png"),
-  plot = sample_efficiency_plot,
-  dpi = 500,
-  width = 9,
-  height = 4
-)
+  # ggsave(
+  #   here("figures", "figure3.png"),
+  #   plot = sample_efficiency_plot,
+  #   dpi = 500,
+  #   width = 9,
+  #   height = 4
+  # )
+})
 
 ## This data compares power curves between anytime-valid and fixed-n methods
 ## Not currently included in the paper.

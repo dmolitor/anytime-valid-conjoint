@@ -1,12 +1,13 @@
-library(avlm)
-library(dplyr)
-library(fixest)
-library(future)
-library(future.apply)
-library(here)
-library(progressr)
-library(readr)
-library(tidyr)
+suppressPackageStartupMessages({
+  library(avlm)
+  library(dplyr)
+  library(fixest)
+  library(future)
+  library(future.apply)
+  library(here)
+  library(readr)
+  library(tidyr)
+})
 
 source(here("code", "cj.R"))
 
@@ -18,7 +19,7 @@ options(
 # Specify conjoint parameters
 tasks_per_respondent <- 1
 significance_level <- 0.05
-number_of_simulations <- 1000
+number_of_simulations <- 10#00
 experiment_size <- 10000
 chunk_size <- 100
 
@@ -80,18 +81,14 @@ false_positive <- function(number_of_respondents) {
 
 set.seed(476816)
 plan(multicore)
-with_progress({
-  pb <- progressor(along = 1:number_of_simulations)
-  false_positive_sims <- future_lapply(
-    1:number_of_simulations,
-    function(iter) {
-      sim <- false_positive(experiment_size) |> mutate(sim_iter = iter)
-      pb()
-      return(sim)
-    },
-    future.seed = TRUE
-  )
-})
+false_positive_sims <- future_lapply(
+  1:number_of_simulations,
+  function(iter) {
+    sim <- false_positive(experiment_size) |> mutate(sim_iter = iter)
+    return(sim)
+  },
+  future.seed = TRUE
+)
 plan(sequential)
 
 false_positives <- bind_rows(false_positive_sims) |>

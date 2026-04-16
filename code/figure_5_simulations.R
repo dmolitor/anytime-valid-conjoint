@@ -1,9 +1,10 @@
-library(dplyr)
-library(future)
-library(future.apply)
-library(here)
-library(progressr)
-library(readr)
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(future)
+  library(future.apply)
+  library(here)
+  library(readr)
+})
 
 source(here("code", "cj.R"))
 
@@ -40,39 +41,35 @@ cj <- ConjointSim$new(
 ## Figure 5 -------------------------------------------------------------------
 
 # How many simulations to run
-n_sim <- 1000
+n_sim <- 10#00
 
 # Run coverage error rate simulations in parallel
 set.seed(563329)
 plan(multicore)
 coverage_sim <- bind_rows(
-  with_progress({
-    pb <- progressor(along = 1:n_sim)
-    future_lapply(
-      1:n_sim,
-      function(x) {
-        coverage_cj <- ConjointSim$new(
-          levels = list(
-            Party = c("Right" = 1/2, "Left" = 1/2),
-            Region = c("North" = 1/4, "South" = 1/4, "East" = 1/4, "West" = 1/4)
-          ),
-          amces = amces,
-          interactions = interactions,
-          n_tasks = tasks_per_respondent
-        )
-        # Simulate the conjoint
-        coverage_cj$simulate_conjoint(
-          alpha = significance_level,
-          experiment_size = number_of_respondents,
-          chunk_size = 50
-        )
-        sim_results <- coverage_cj$estimates |> mutate(sim_iter = x)
-        pb()
-        return(sim_results)
-      },
-      future.seed = TRUE
-    )
-  })
+  future_lapply(
+    1:n_sim,
+    function(x) {
+      coverage_cj <- ConjointSim$new(
+        levels = list(
+          Party = c("Right" = 1/2, "Left" = 1/2),
+          Region = c("North" = 1/4, "South" = 1/4, "East" = 1/4, "West" = 1/4)
+        ),
+        amces = amces,
+        interactions = interactions,
+        n_tasks = tasks_per_respondent
+      )
+      # Simulate the conjoint
+      coverage_cj$simulate_conjoint(
+        alpha = significance_level,
+        experiment_size = number_of_respondents,
+        chunk_size = 50
+      )
+      sim_results <- coverage_cj$estimates |> mutate(sim_iter = x)
+      return(sim_results)
+    },
+    future.seed = TRUE
+  )
 )
 plan(sequential)
 

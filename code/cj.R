@@ -1,13 +1,14 @@
-library(avlm)
-library(broom)
-library(dplyr)
-library(fixest)
-library(ggplot2)
-library(progressr)
-library(fixest)
-library(future.apply)
-library(R6)
-library(tidyr)
+suppressPackageStartupMessages({
+  library(avlm)
+  library(broom)
+  library(dplyr)
+  library(fixest)
+  library(ggplot2)
+  library(fixest)
+  library(future.apply)
+  library(R6)
+  library(tidyr)
+})
 
 # This class implements a simple conjoint object. Primarily used for the empirical simulations
 ConjointSim <- R6Class(
@@ -288,7 +289,6 @@ ConjointSim <- R6Class(
       verbose = TRUE
     ) {
       power_calc <- function() {
-        pb <- progressor(along = 1:n_sim)
         if (parallel) plan(multicore)
         sims <- future_lapply(
           1:n_sim,
@@ -299,38 +299,17 @@ ConjointSim <- R6Class(
               experiment_size = experiment_size
             )
             sim <- mutate(sim, sim_iter = sim_iter)
-            pb()
             return(sim)
           },
-          future.seed = TRUE,
-          future.globals = c("compute_true_amces"),
-          future.packages = c(
-            "avlm",
-            "broom",
-            "dplyr",
-            "fixest",
-            "ggplot2",
-            "progressr",
-            "fixest",
-            "future.apply",
-            "marginaleffects",
-            "R6",
-            "tidyr"
-          )
+          future.seed = TRUE
         )
         sims <- bind_rows(sims)
         if (parallel) plan(sequential)
         return(sims)
       }
-      if (verbose) {
-        sim_results <- tryCatch({
-          with_progress({ retry({power_calc()}, n = 5) })
-        }, error = function(e) with_progress({ retry({power_calc()}, n = 5) }))
-      } else {
-        sim_results <- tryCatch({
-          retry({power_calc()}, n = 5) 
-        }, error = function(e) retry({power_calc()}, n = 5))
-      }
+      sim_results <- tryCatch({
+        retry({power_calc()}, n = 5) 
+      }, error = function(e) retry({power_calc()}, n = 5))
       return(sim_results)
     },
 
@@ -342,7 +321,6 @@ ConjointSim <- R6Class(
       verbose = TRUE
     ) {
       power_calc <- function() {
-        pb <- progressor(along = 1:n_sim)
         if (parallel) plan(multicore)
         sims <- future_lapply(
           1:n_sim,
@@ -352,38 +330,17 @@ ConjointSim <- R6Class(
               experiment_size = experiment_size
             )
             sim <- mutate(sim, sim_iter = sim_iter)
-            pb()
             return(sim)
           },
-          future.seed = TRUE,
-          future.globals = c("compute_true_amces"),
-          future.packages = c(
-            "avlm",
-            "broom",
-            "dplyr",
-            "fixest",
-            "ggplot2",
-            "progressr",
-            "fixest",
-            "future.apply",
-            "marginaleffects",
-            "R6",
-            "tidyr"
-          )
+          future.seed = TRUE
         )
         sims <- bind_rows(sims)
         if (parallel) plan(sequential)
         return(sims)
       }
-      if (verbose) {
-        sim_results <- tryCatch({
-          with_progress({ retry({power_calc()}, n = 5) })
-        }, error = function(e) with_progress({ retry({power_calc()}, n = 5) }))
-      } else {
-        sim_results <- tryCatch({
-          retry({power_calc()}, n = 5) 
-        }, error = function(e) retry({power_calc()}, n = 5))
-      }
+      sim_results <- tryCatch({
+        retry({power_calc()}, n = 5) 
+      }, error = function(e) retry({power_calc()}, n = 5))
       return(sim_results)
     },
 

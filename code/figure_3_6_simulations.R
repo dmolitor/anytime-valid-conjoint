@@ -1,6 +1,8 @@
-library(dplyr)
-library(here)
-library(fst)
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(here)
+  library(fst)
+})
 
 source(here("code", "cj.R"))
 
@@ -12,10 +14,10 @@ options(
 # Specify conjoint parameters
 tasks_per_respondent <- 1
 significance_level <- 0.05
-number_of_simulations <- 500
-sample_size_grid <- c(3000, 6000, 11000, 18000)
-amce_grid <- seq(0.02, 0.13, by = 0.01)
-attribute_levels_grid <- c(4, 6, 9)
+number_of_simulations <- 50#0
+sample_size_grid <- c(6000)#c(3000, 6000, 11000, 18000)
+amce_grid <- seq(0.02, 0.02, by = 0.01)#seq(0.02, 0.13, by = 0.01)
+attribute_levels_grid <- c(6)#c(4, 6, 9)
 
 ## Run anytime-valid efficiency simulations -----------------------------------
 
@@ -30,9 +32,6 @@ sim_efficiency <- lapply(
           amce_grid,
           function(amce) {
             amce_grid <- seq(amce, amce + 0.01, length.out = n_levels + 1)[1:n_levels]
-            cat("Sample size:", sim_n, "\n")
-            cat("AMCE grid:", paste0(amce_grid, collapse = ", "), "\n")
-            cat("Number of levels:", n_levels, "\n")
             # Setup the conjoint object
             regions <- setNames(amce_grid, paste("Region", 1:n_levels))
             amces <- list(
@@ -73,7 +72,9 @@ sim_efficiency <- lapply(
   }
 )
 sim_efficiency_df <- bind_rows(lapply(sim_efficiency, bind_rows))
-write_fst(sim_efficiency_df, here("data", "figure_3_6_av.fst"))
+suppressMessages({
+  write_fst(sim_efficiency_df, here("data", "figure_3_6_av.fst"))
+})
 
 ## Run fixed-sample efficiency simulations ------------------------------------
 
@@ -87,9 +88,6 @@ sim_efficiency_fixed <- lapply(
           amce_grid,
           function(amce) {
             amce_grid <- seq(amce, amce + 0.01, length.out = n_levels + 1)[1:n_levels]
-            cat("Sample size:", sim_n, "\n")
-            cat("AMCE grid:", paste0(amce_grid, collapse = ", "), "\n")
-            cat("Number of levels:", n_levels, "\n")
             # Setup the conjoint object
             regions <- setNames(amce_grid, paste("Region", 1:n_levels))
             amces <- list(
@@ -130,7 +128,9 @@ sim_efficiency_fixed <- lapply(
 )
 
 sim_efficiency_fixed_df <- bind_rows(lapply(sim_efficiency_fixed, bind_rows))
-write_fst(sim_efficiency_fixed_df, here("data", "figure_3_6_fixed.fst"))
+suppressMessages({
+  write_fst(sim_efficiency_fixed_df, here("data", "figure_3_6_fixed.fst"))
+})
 
 ## Calculate the sample-efficiency of both methods ----------------------------
 
@@ -171,4 +171,6 @@ sample_efficiency_df <- sim_efficiency_df |>
     N = factor(paste("N:", N), levels = paste("N:", unique(sim_efficiency_df$N)))
   )
 
-write_fst(sample_efficiency_df, here("data", "figure_3_6_efficiency.fst"))
+suppressMessages({
+  write_fst(sample_efficiency_df, here("data", "figure_3_6_efficiency.fst"))
+})
