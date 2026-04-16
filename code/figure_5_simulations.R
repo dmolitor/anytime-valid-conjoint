@@ -5,7 +5,7 @@ library(here)
 library(progressr)
 library(readr)
 
-source(here("cj.R"))
+source(here("code", "cj.R"))
 
 options(future.globals.maxSize = Inf)
 
@@ -40,9 +40,10 @@ cj <- ConjointSim$new(
 ## Figure 5 -------------------------------------------------------------------
 
 # How many simulations to run
-n_sim <- 100#0
+n_sim <- 1000
 
 # Run coverage error rate simulations in parallel
+set.seed(563329)
 plan(multicore)
 coverage_sim <- bind_rows(
   with_progress({

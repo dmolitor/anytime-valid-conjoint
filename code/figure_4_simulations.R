@@ -2,7 +2,7 @@ library(here)
 library(readr)
 library(cjpowR)
 
-source(here("cj.R"))
+source(here("code", "cj.R"))
 
 options(
   future.globals.maxSize = Inf,
@@ -14,7 +14,7 @@ significance_level <- 0.05
 target_power <- 0.8
 tasks_per_respondent <- 1
 target_levels <- 6
-number_of_simulations <- 50#0
+number_of_simulations <- 1000
 
 # amce_grid <- seq(0.01, 0.05, length.out = 9); # Run this if you want a full grid of target AMCE values
 amce_grid <- 0.03
@@ -22,6 +22,7 @@ ratio_grid <- c(1.25, 1.5, 1.75, 2, 2.5, 3)
 
 ## Calculate the empirical performance across a grid of AMCE values -----------
 
+set.seed(641423)
 power <- lapply(
   amce_grid,
   function(amce) {

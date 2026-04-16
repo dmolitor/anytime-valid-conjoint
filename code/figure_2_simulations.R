@@ -8,7 +8,7 @@ library(progressr)
 library(readr)
 library(tidyr)
 
-source(here("cj.R"))
+source(here("code", "cj.R"))
 
 options(
   future.globals.maxSize = Inf,
@@ -18,7 +18,7 @@ options(
 # Specify conjoint parameters
 tasks_per_respondent <- 1
 significance_level <- 0.05
-number_of_simulations <- 100#0
+number_of_simulations <- 1000
 experiment_size <- 10000
 chunk_size <- 100
 
@@ -78,6 +78,7 @@ false_positive <- function(number_of_respondents) {
 
 ## Calculate the cumulative Type 1 error curves -------------------------------
 
+set.seed(476816)
 plan(multicore)
 with_progress({
   pb <- progressor(along = 1:number_of_simulations)

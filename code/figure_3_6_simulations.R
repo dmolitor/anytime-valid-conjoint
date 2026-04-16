@@ -2,7 +2,7 @@ library(dplyr)
 library(here)
 library(fst)
 
-source(here("cj.R"))
+source(here("code", "cj.R"))
 
 options(
   future.globals.maxSize = Inf,
@@ -12,13 +12,14 @@ options(
 # Specify conjoint parameters
 tasks_per_respondent <- 1
 significance_level <- 0.05
-number_of_simulations <- 100#500
-sample_size_grid <- c(6000)#(3000, 6000, 11000, 18000)
-amce_grid <- seq(0.02, 0.02, by = 0.01)#, 0.13, by = 0.01)
-attribute_levels_grid <- c(6)#(4, 6, 9)
+number_of_simulations <- 500
+sample_size_grid <- c(3000, 6000, 11000, 18000)
+amce_grid <- seq(0.02, 0.13, by = 0.01)
+attribute_levels_grid <- c(4, 6, 9)
 
 ## Run anytime-valid efficiency simulations -----------------------------------
 
+set.seed(42074)
 sim_efficiency <- lapply(
   attribute_levels_grid,
   function(n_levels) {

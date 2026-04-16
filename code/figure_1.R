@@ -2,7 +2,7 @@ library(here)
 library(ggplot2)
 library(readr)
 
-source(here("cj.R"))
+source(here("code", "cj.R"))
 
 options(future.globals.maxSize = Inf)
 
@@ -34,6 +34,7 @@ cj <- ConjointSim$new(
   n_tasks = tasks_per_respondent
 )
 # Simulate the conjoint
+set.seed(163373)
 cj$simulate_conjoint(
   alpha = significance_level,
   experiment_size = number_of_respondents,
