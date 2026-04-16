@@ -22,7 +22,6 @@ pkg_install(c(
   "ggplot2@4.0.2",
   "ggtext@0.1.2",
   "glue@1.8.0",
-  "grid@4.5.3",
   "gridExtra@2.3",
   "here@1.0.2",
   "patchwork@1.3.2",

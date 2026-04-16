@@ -76,13 +76,13 @@ suppressWarnings({
       panel.grid.minor = element_blank()
     )
 
-  # ggsave(
-  #   here("figures", "figure4.png"),
-  #   plot = efficiency_plot,
-  #   dpi = 500,
-  #   width = 5,
-  #   height = 3
-  # )
+  ggsave(
+    here("figures", "figure4.png"),
+    plot = efficiency_plot,
+    dpi = 500,
+    width = 5,
+    height = 3
+  )
 
 })
 

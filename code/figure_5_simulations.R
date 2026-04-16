@@ -41,7 +41,7 @@ cj <- ConjointSim$new(
 ## Figure 5 -------------------------------------------------------------------
 
 # How many simulations to run
-n_sim <- 10#00
+n_sim <- 1000
 
 # Run coverage error rate simulations in parallel
 set.seed(563329)

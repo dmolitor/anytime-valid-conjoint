@@ -55,12 +55,12 @@ suppressWarnings({
     labs(x = "", y = "Coverage error rate")
 
   # Save plot
-  # ggsave(
-  #   here("figures", "figure5.png"),
-  #   plot = error_rates_plot,
-  #   dpi = 500,
-  #   width = 4,
-  #   height = 2
-  # )
+  ggsave(
+    here("figures", "figure5.png"),
+    plot = error_rates_plot,
+    dpi = 500,
+    width = 4,
+    height = 2
+  )
 
 })

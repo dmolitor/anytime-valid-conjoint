@@ -9,7 +9,7 @@ suppressPackageStartupMessages({
 
 significance_level <- 0.05
 
-false_positives <- read_csv(here("data", "figure2"), show_col_types = FALSE)
+false_positives <- read_csv(here("data", "figure2.csv"), show_col_types = FALSE)
 
 suppressWarnings({
   false_positive_plot <- ggplot(
@@ -33,11 +33,11 @@ suppressWarnings({
     theme_minimal() +
     theme(axis.title.y = element_markdown(), legend.position = "bottom")
 
-  # ggsave(
-  #   here("figures", "figure2.png"),
-  #   plot = false_positive_plot,
-  #   dpi = 500,
-  #   width = 5,
-  #   height = 4
-  # )
+  ggsave(
+    here("figures", "figure2.png"),
+    plot = false_positive_plot,
+    dpi = 500,
+    width = 5,
+    height = 4
+  )
 })

@@ -45,6 +45,11 @@ Rscript code/figure_3_6_simulations.R
 echo "✔ Done!"
 
 echo
+echo "---------------------------- code/figure_4_simulations.R -----"
+Rscript code/figure_4_simulations.R
+echo "✔ Done!"
+
+echo
 echo "---------------------------- code/figure_5_simulations.R -----"
 Rscript code/figure_5_simulations.R
 echo "✔ Done!"

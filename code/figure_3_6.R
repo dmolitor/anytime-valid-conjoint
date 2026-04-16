@@ -109,13 +109,13 @@ suppressWarnings({
     plot_layout(ncol = 2, guides = "collect") &
     theme(legend.position = "bottom")
 
-  # ggsave(
-  #   here("figures", "figure6.png"),
-  #   plot = sample_efficiency_plot,
-  #   dpi = 500,
-  #   width = 8,
-  #   height = 8
-  # )
+  ggsave(
+    here("figures", "figure6.png"),
+    plot = sample_efficiency_plot,
+    dpi = 500,
+    width = 8,
+    height = 8
+  )
 
 })
 
@@ -274,13 +274,13 @@ suppressWarnings({
     plot_layout(ncol = 2, guides = "collect") &
     theme(legend.position = "bottom")
 
-  # ggsave(
-  #   here("figures", "figure3.png"),
-  #   plot = sample_efficiency_plot,
-  #   dpi = 500,
-  #   width = 9,
-  #   height = 4
-  # )
+  ggsave(
+    here("figures", "figure3.png"),
+    plot = sample_efficiency_plot,
+    dpi = 500,
+    width = 9,
+    height = 4
+  )
 })
 
 ## This data compares power curves between anytime-valid and fixed-n methods

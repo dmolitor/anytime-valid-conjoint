@@ -19,7 +19,7 @@ options(
 # Specify conjoint parameters
 tasks_per_respondent <- 1
 significance_level <- 0.05
-number_of_simulations <- 10#00
+number_of_simulations <- 1000
 experiment_size <- 10000
 chunk_size <- 100
 
@@ -102,4 +102,4 @@ false_positives <- bind_rows(false_positive_sims) |>
   mutate(which = case_when(which == "av" ~ "Anytime-valid", TRUE ~ "Conventional")) |>
   rename(Method = which)
 
-write_csv(false_positives, here("data", "figure2"))
+write_csv(false_positives, here("data", "figure2.csv"))

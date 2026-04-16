@@ -14,10 +14,10 @@ options(
 # Specify conjoint parameters
 tasks_per_respondent <- 1
 significance_level <- 0.05
-number_of_simulations <- 50#0
-sample_size_grid <- c(6000)#c(3000, 6000, 11000, 18000)
-amce_grid <- seq(0.02, 0.02, by = 0.01)#seq(0.02, 0.13, by = 0.01)
-attribute_levels_grid <- c(6)#c(4, 6, 9)
+number_of_simulations <- 500
+sample_size_grid <- c(3000, 6000, 11000, 18000)
+amce_grid <- seq(0.02, 0.13, by = 0.01)
+attribute_levels_grid <- c(4, 6, 9)
 
 ## Run anytime-valid efficiency simulations -----------------------------------
 
