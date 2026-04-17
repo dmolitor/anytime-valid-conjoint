@@ -15,12 +15,13 @@ dockerfile <- create(
     "!data/figure4.fst",
     "!data/figure5.csv",
     "!data/.gitignore"
-  )
+  ),
+  optimize_pak = TRUE
 )
 
 build(
   image_name = "anytime-valid-conjoint",
-  push = FALSE,
+  push = TRUE,
   dh_username = Sys.getenv("DOCKER_UNAME"),
   dh_password = Sys.getenv("DOCKER_PWD")
 )
