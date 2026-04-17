@@ -34,25 +34,25 @@ echo "✔ Done!"
 ## If you uncomment the lines below, the simulation results will fully replicate.
 ## However, we recommend just using the saved intermediate files and this will run much faster.
 
-echo
-echo "---------------------------- code/figure_2_simulations.R -----"
-Rscript code/figure_2_simulations.R
-echo "✔ Done!"
+# echo
+# echo "---------------------------- code/figure_2_simulations.R -----"
+# Rscript code/figure_2_simulations.R
+# echo "✔ Done!"
 
-echo
-echo "---------------------------- code/figure_3_6_simulations.R ---"
-Rscript code/figure_3_6_simulations.R
-echo "✔ Done!"
+# echo
+# echo "---------------------------- code/figure_3_6_simulations.R ---"
+# Rscript code/figure_3_6_simulations.R
+# echo "✔ Done!"
 
-echo
-echo "---------------------------- code/figure_4_simulations.R -----"
-Rscript code/figure_4_simulations.R
-echo "✔ Done!"
+# echo
+# echo "---------------------------- code/figure_4_simulations.R -----"
+# Rscript code/figure_4_simulations.R
+# echo "✔ Done!"
 
-echo
-echo "---------------------------- code/figure_5_simulations.R -----"
-Rscript code/figure_5_simulations.R
-echo "✔ Done!"
+# echo
+# echo "---------------------------- code/figure_5_simulations.R -----"
+# Rscript code/figure_5_simulations.R
+# echo "✔ Done!"
 
 # ----------------------------------------------------------------------------------------------------
 

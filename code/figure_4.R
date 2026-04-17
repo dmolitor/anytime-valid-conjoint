@@ -1,12 +1,14 @@
 suppressPackageStartupMessages({
   library(ggplot2)
   library(here)
-  library(readr)
+  library(fst)
   library(scales)
   library(dplyr)
 })
 
-power_df <- read_csv(here("data", "figure4.csv"), show_col_types = FALSE)
+power_df <- suppressMessages({
+  read_fst(here("data", "figure4.fst"))
+}) |> as_tibble()
 
 power_df <- power_df |>
   filter(attribute == "Region") |>

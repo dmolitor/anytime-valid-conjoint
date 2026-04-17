@@ -1,7 +1,7 @@
 suppressPackageStartupMessages({
   library(here)
-  library(readr)
   library(cjpowR)
+  library(fst)
 })
 
 source(here("code", "cj.R"))
@@ -71,4 +71,6 @@ power <- lapply(
   }
 )
 
-write_csv(power_df <- bind_rows(power), here("data", "figure4.csv"))
+suppressMessages({
+  write_fst(power_df <- bind_rows(power), here("data", "figure4.fst"))
+})

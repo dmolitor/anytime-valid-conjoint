@@ -1,3 +1,7 @@
 # Ignore everything except this file
 *
 !.gitignore
+!figure_3_6_efficiency.fst
+!figure2.csv
+!figure4.fst
+!figure5.csv

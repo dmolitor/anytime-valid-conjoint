@@ -1,3 +1,10 @@
+sink(nullfile())
+sink(nullfile(), type = "message")
+on.exit({
+  sink(type = "message")
+  sink()
+}, add = TRUE)
+
 suppressPackageStartupMessages({
   library(dplyr)
   library(here)
