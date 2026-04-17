@@ -14,9 +14,11 @@ wheels/
 # renv stuff
 renv/
 .Rprofile
+.Renviron
 
 # Ignore /resources (where I may store Claude-related things)
 resources/
 
-# Replication outputs
+# Replication outputs/inputs
 log.txt
+replication/

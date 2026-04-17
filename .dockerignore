@@ -1,0 +1,15 @@
+renv/
+replication/
+.Rprofile
+.Renviron
+figures/
+!figures/.gitignore
+data/
+!data/figure_3_6_efficiency.fst
+!data/figure2.csv
+!data/figure4.csv
+!data/figure5.csv
+!data/.gitignore
+Dockerfile
+.dockerignore
+**/.DS_Store
