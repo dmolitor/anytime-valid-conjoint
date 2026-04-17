@@ -12,7 +12,7 @@ dockerfile <- create(
     "data/",
     "!data/figure_3_6_efficiency.fst",
     "!data/figure2.csv",
-    "!data/figure4.csv",
+    "!data/figure4.fst",
     "!data/figure5.csv",
     "!data/.gitignore"
   )

@@ -13,13 +13,6 @@ echo
 echo "--------------------------------------------------------------"
 echo "Timestamp started: $(date "+%Y-%m-%d %H:%M:%S %Z")"
 
-# Ensure all dependencies are installed
-echo
-echo "---------------------------- code/install_dependencies.R -----"
-Rscript code/install_dependencies.R
-echo "✔ Done!"
-
-
 # Replicate all figures from the main text
 echo
 echo "---------------------------- code/figure_1.R -----------------"
