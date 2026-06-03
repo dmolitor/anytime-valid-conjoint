@@ -3,50 +3,12 @@ suppressPackageStartupMessages({
   library(here)
   library(fst)
   library(scales)
-  library(dplyr)
+  library(tibble)
 })
 
 power_df <- suppressMessages({
   read_fst(here("data", "figure4.fst"))
 }) |> as_tibble()
-
-power_df <- power_df |>
-  filter(attribute == "Region") |>
-  mutate(
-    stat_sig = 0 < conf.low | 0 > conf.high,
-    overshoot_ratio = round(amce / target, 2)
-  ) |>
-  group_by(attribute, level, sim_iter, amce, target) |>
-  summarize(
-    type2_error = all(!stat_sig),
-    early_stop = if (any(stat_sig)) {
-      i[min(which(stat_sig))]
-    } else {
-      first(fixed_n)
-    },
-    fixed_n = first(fixed_n),
-    overshoot_ratio = first(overshoot_ratio),
-    .groups = "drop_last"
-  ) |>
-  ungroup() |>
-  # We group by overshoot_ratio to summarize across all target AMCEs
-  # If we want separate curves by each target AMCE, do the following:
-  # group_by(attribute, level, amce, target)
-  group_by(attribute, level, overshoot_ratio) |>
-  summarize(
-    power = mean(!type2_error),
-    power_se = sd(!type2_error)/sqrt(n()),
-    power_lb = power - 1.96*power_se,
-    power_ub = power + 1.96*power_se,
-    pct_sample_save = mean(1 - early_stop/fixed_n),
-    pct_sample_save_se = sd(1 - early_stop/fixed_n)/sqrt(n()),
-    pct_sample_save_lb = pct_sample_save - 1.96*pct_sample_save_se,
-    pct_sample_save_ub = pct_sample_save + 1.96*pct_sample_save_se,
-    fixed_n = first(fixed_n),
-    n = n(),
-    .groups = "drop_last"
-  ) |>
-  ungroup()
 
 # Plot it
 
@@ -65,7 +27,8 @@ suppressWarnings({
     geom_line(linewidth = 0.3) +
     geom_point(size = 1) +
     scale_y_continuous(
-      labels = scales::percent_format(accuracy = 1)
+      labels = scales::percent_format(accuracy = 1),
+      breaks = seq(0.2, 0.8, by = 0.1)
     ) +
     scale_x_continuous(breaks = seq(1.25, 3, by = 0.25)) +
     labs(

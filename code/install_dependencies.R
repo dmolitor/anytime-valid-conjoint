@@ -30,5 +30,6 @@ pkg_install(c(
   "readr@2.2.0",
   "scales@1.4.0",
   "tidyr@1.3.2",
+  "tibble@3.3.1",
   "viridis@0.6.5"
 ))

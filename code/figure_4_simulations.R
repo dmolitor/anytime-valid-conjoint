@@ -1,6 +1,7 @@
 suppressPackageStartupMessages({
   library(here)
   library(cjpowR)
+  library(dplyr)
   library(fst)
 })
 
@@ -62,7 +63,7 @@ power <- lapply(
     conjoint_sim_power <- cj$power(
       n_sim = number_of_simulations,
       alpha = significance_level,
-      experiment_size = exp_size
+      experiment_size = 5 * exp_size
     )
     conjoint_sim_power <- conjoint_sim_power |> 
       mutate(target = .env$amce, fixed_n = ceiling(exp_size))
@@ -71,6 +72,46 @@ power <- lapply(
   }
 )
 
+power_df <- bind_rows(power)
+
+power_df <- power_df |>
+  filter(attribute == "Region") |>
+  mutate(
+    stat_sig = 0 < conf.low | 0 > conf.high,
+    overshoot_ratio = round(amce / target, 2)
+  ) |>
+  group_by(attribute, level, sim_iter, amce, target) |>
+  summarize(
+    type2_error = all(!stat_sig),
+    early_stop = if (any(stat_sig)) {
+      i[min(which(stat_sig))]
+    } else {
+      first(fixed_n)
+    },
+    fixed_n = first(fixed_n),
+    overshoot_ratio = first(overshoot_ratio),
+    .groups = "drop_last"
+  ) |>
+  ungroup() |>
+  # We group by overshoot_ratio to summarize across all target AMCEs
+  # If we want separate curves by each target AMCE, do the following:
+  # group_by(attribute, level, amce, target)
+  group_by(attribute, level, overshoot_ratio) |>
+  summarize(
+    power = mean(!type2_error),
+    power_se = sd(!type2_error)/sqrt(n()),
+    power_lb = power - 1.96*power_se,
+    power_ub = power + 1.96*power_se,
+    pct_sample_save = mean(1 - early_stop/fixed_n),
+    pct_sample_save_se = sd(1 - early_stop/fixed_n)/sqrt(n()),
+    pct_sample_save_lb = pct_sample_save - 1.96*pct_sample_save_se,
+    pct_sample_save_ub = pct_sample_save + 1.96*pct_sample_save_se,
+    fixed_n = first(fixed_n),
+    n = n(),
+    .groups = "drop_last"
+  ) |>
+  ungroup()
+
 suppressMessages({
-  write_fst(power_df <- bind_rows(power), here("data", "figure4.fst"))
+  write_fst(power_df, here("data", "figure4.fst"), compress = 100)
 })

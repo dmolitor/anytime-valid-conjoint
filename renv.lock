@@ -2544,6 +2544,36 @@
       "Maintainer": "Lionel Henry <lionel@posit.co>",
       "Repository": "CRAN"
     },
+    "tugboat": {
+      "Package": "tugboat",
+      "Version": "0.1.6",
+      "Source": "Repository",
+      "Title": "Build a Docker Image from a Directory or Project",
+      "Authors@R": "person(given = \"Daniel\", family = \"Molitor\", role = c(\"aut\", \"cph\", \"cre\"), email = \"molitdj97@gmail.com\")",
+      "Description": "Simple utilities to generate a Dockerfile from a directory or project, build the corresponding Docker image, push the image to DockerHub, and publicly share the project via Binder.",
+      "Imports": [
+        "here",
+        "renv (>= 1.0.0)"
+      ],
+      "Suggests": [
+        "gert",
+        "usethis",
+        "yaml",
+        "rmarkdown",
+        "testthat (>= 3.0.0)"
+      ],
+      "License": "GPL (>= 3)",
+      "Encoding": "UTF-8",
+      "RoxygenNote": "7.3.3",
+      "URL": "https://www.dmolitor.com/tugboat/",
+      "Config/testthat/edition": "3",
+      "Config/testthat/start-first": "create",
+      "Language": "en-US",
+      "NeedsCompilation": "no",
+      "Author": "Daniel Molitor [aut, cph, cre]",
+      "Maintainer": "Daniel Molitor <molitdj97@gmail.com>",
+      "Repository": "CRAN"
+    },
     "tzdb": {
       "Package": "tzdb",
       "Version": "0.5.0",
