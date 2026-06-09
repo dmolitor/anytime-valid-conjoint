@@ -1,8 +1,12 @@
-sink(nullfile())
-sink(nullfile(), type = "message")
+zz <- file(nullfile(), open = "wt")
+
+sink(zz)
+sink(zz, type = "message")
+
 on.exit({
-  sink(type = "message")
-  sink()
+  while (sink.number(type = "message") > 0) sink(type = "message")
+  while (sink.number() > 0) sink()
+  close(zz)
 }, add = TRUE)
 
 suppressPackageStartupMessages({

@@ -21,7 +21,7 @@ number_of_simulations <- 1000
 
 # amce_grid <- seq(0.01, 0.05, length.out = 9); # Run this if you want a full grid of target AMCE values
 amce_grid <- 0.03
-ratio_grid <- c(1.25, 1.5, 1.75, 2, 2.5, 3)
+ratio_grid <- c(1, 1.25, 1.5, 2, 2.5, 3)
 
 ## Calculate the empirical performance across a grid of AMCE values -----------
 

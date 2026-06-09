@@ -28,9 +28,9 @@ suppressWarnings({
     geom_point(size = 1) +
     scale_y_continuous(
       labels = scales::percent_format(accuracy = 1),
-      breaks = seq(0.2, 0.8, by = 0.1)
+      breaks = seq(-0.2, 0.8, by = 0.2)
     ) +
-    scale_x_continuous(breaks = seq(1.25, 3, by = 0.25)) +
+    scale_x_continuous(breaks = seq(1, 3, by = 0.25)) +
     labs(
       x = "True AMCE \u00F7 Powered-for AMCE",
       y = "Mean sample savings"
