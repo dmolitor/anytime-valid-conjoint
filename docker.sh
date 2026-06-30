@@ -1,12 +1,6 @@
 source .env
 
 tugboat create \
-  -e data/ \
-  -e '!data/figure_3_6_efficiency.fst' \
-  -e '!data/figure2.csv' \
-  -e '!data/figure4.fst' \
-  -e '!data/figure5.csv' \
-  -e '!data/.gitignore' \
   -e .binder/ \
   -e .venv/ \
   -e 'figures/*' \
