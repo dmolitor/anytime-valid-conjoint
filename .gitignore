@@ -22,3 +22,7 @@ resources/
 # Replication outputs/inputs
 log.txt
 replication/
+
+.env
+uv.lock
+pyproject.toml
