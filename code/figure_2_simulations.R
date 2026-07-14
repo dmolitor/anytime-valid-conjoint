@@ -1,5 +1,4 @@
 suppressPackageStartupMessages({
-  library(avlm)
   library(dplyr)
   library(fixest)
   library(future)
@@ -54,8 +53,8 @@ false_positive <- function(number_of_respondents) {
     # Tidy the results; AV and fixed-N
     cj_estimates_av <- av_tidy(
       cj_model,
-      g = optimal_g(nrow(conjoint_data), length(coef(cj_model)), significance_level),
-      alpha = significance_level
+      alpha = significance_level,
+      cluster = conjoint_data$resp_id
     ) |>
       filter(term != "(Intercept)") |>
       mutate(i = index, which = "av")

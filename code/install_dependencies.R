@@ -11,7 +11,6 @@ if (!require(pak, quietly = TRUE)) {
 library(pak, quietly = TRUE)
 
 pkg_install(c(
-  "dmolitor/avlm@dev",
   "m-freitag/cjpowR",
   "broom@1.0.12",
   "dplyr@1.2.1",
