@@ -6,6 +6,8 @@ suppressPackageStartupMessages({
   library(tibble)
 })
 
+source(here("code", "figure_style.R"))
+
 power_df <- suppressMessages({
   read_fst(here("data", "figure4.fst"))
 }) |> as_tibble()
@@ -23,9 +25,9 @@ suppressWarnings({
       ymax = pct_sample_save_ub
     )
   ) +
-    geom_ribbon(alpha = 0.25) +
-    geom_line(linewidth = 0.3) +
-    geom_point(size = 1) +
+    geom_ribbon(fill = paper_colors$av, alpha = 0.16) +
+    geom_line(color = paper_colors$av, linewidth = 0.6) +
+    geom_point(color = paper_colors$av, size = 1.2) +
     scale_y_continuous(
       labels = scales::percent_format(accuracy = 1),
       breaks = seq(-0.2, 0.8, by = 0.2)
@@ -33,18 +35,16 @@ suppressWarnings({
     scale_x_continuous(breaks = seq(1, 3, by = 0.25)) +
     labs(
       x = "True AMCE \u00F7 Powered-for AMCE",
-      y = "Mean sample savings"
+      y = "Mean clusters saved"
     ) +
-    theme_minimal(base_size = 11) +
+    conjoint_theme() +
     theme(
-      legend.position = "none",
-      panel.grid.minor = element_blank()
+      legend.position = "none"
     )
 
-  ggsave(
-    here("figures", "figure4.png"),
+  save_paper_figure(
+    "figure4.png",
     plot = efficiency_plot,
-    dpi = 500,
     width = 5,
     height = 3
   )

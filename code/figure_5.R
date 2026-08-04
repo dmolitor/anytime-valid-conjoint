@@ -6,6 +6,8 @@ suppressPackageStartupMessages({
   library(scales)
 })
 
+source(here("code", "figure_style.R"))
+
 n_sim <- 1000
 significance_level <- 0.05
 
@@ -42,10 +44,10 @@ suppressWarnings({
       ymin = lower,
       ymax = upper
     )) +
-    geom_point(position = position_dodge(width = 0.25)) +
-    geom_linerange(position = position_dodge(width = 0.25)) +
-    geom_hline(yintercept = significance_level, linetype = "dashed", color = "red") +
-    theme_minimal() +
+    geom_point(color = paper_colors$av, position = position_dodge(width = 0.25), size = 1.5) +
+    geom_linerange(color = paper_colors$av, position = position_dodge(width = 0.25), linewidth = 0.45) +
+    geom_hline(yintercept = significance_level, linetype = "dashed", color = paper_colors$reference) +
+    conjoint_theme() +
     coord_flip() +
     scale_y_continuous(
       labels = percent,
@@ -55,12 +57,11 @@ suppressWarnings({
     labs(x = "", y = "Coverage error rate")
 
   # Save plot
-  ggsave(
-    here("figures", "figure5.png"),
+  save_paper_figure(
+    "figure5.png",
     plot = error_rates_plot,
-    dpi = 500,
-    width = 4,
-    height = 2
+    width = 5,
+    height = 2.6
   )
 
 })

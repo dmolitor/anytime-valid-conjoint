@@ -12,13 +12,17 @@ options(future.globals.maxSize = Inf)
 
 ##  Setup conjoint object
 
-# Specify the attribute-level AMCEs for attribute 1 & 2
-amces <- list(
-  Party = c("Left" = 0.1),
-  Region = c("South" = -0.01, "East" = -0.075, "West" = 0.05)
+# Specify utility coefficients for the nonlinear forced-choice DGP.
+# The exact AMCEs are computed by finite summation in `compute_true_amces()`.
+utility_effects <- list(
+  Party = c("Left" = 0.35),
+  Region = c("South" = -0.06, "East" = -0.27, "West" = 0.16)
 )
-interactions <- matrix(
-  rep(0, 8), 2, 4,
+utility_interactions <- matrix(
+  c(0, 0, 0, 0,
+    0, 0.04, -0.05, 0.03),
+  2, 4,
+  byrow = TRUE,
   dimnames = list(c("Right", "Left"), c("North", "South", "East", "West"))
 )
 
@@ -33,9 +37,10 @@ cj <- ConjointSim$new(
     Party = c("Right" = 1/2, "Left" = 1/2),
     Region = c("North" = 1/4, "South" = 1/4, "East" = 1/4, "West" = 1/4)
   ),
-  amces = amces,
-  interactions = interactions,
-  n_tasks = tasks_per_respondent
+  amces = utility_effects,
+  interactions = utility_interactions,
+  n_tasks = tasks_per_respondent,
+  dgp = "logit"
 )
 
 ## Figure 5 -------------------------------------------------------------------
@@ -55,9 +60,10 @@ coverage_sim <- bind_rows(
           Party = c("Right" = 1/2, "Left" = 1/2),
           Region = c("North" = 1/4, "South" = 1/4, "East" = 1/4, "West" = 1/4)
         ),
-        amces = amces,
-        interactions = interactions,
-        n_tasks = tasks_per_respondent
+        amces = utility_effects,
+        interactions = utility_interactions,
+        n_tasks = tasks_per_respondent,
+        dgp = "logit"
       )
       # Simulate the conjoint
       coverage_cj$simulate_conjoint(

@@ -1,26 +1,35 @@
 suppressPackageStartupMessages({
   library(ggplot2)
-  library(ggtext)
   library(grid)
-  library(gridExtra)
   library(fst)
   library(glue)
   library(scales)
-  library(viridis)
   library(patchwork)
   library(here)
   library(dplyr)
 })
 
+source(here("code", "figure_style.R"))
+
 sample_efficiency_df <- suppressMessages({
   read_fst(here("data", "figure_3_6_efficiency.fst"))
-}) |> as_tibble()
+}) |>
+  as_tibble() |>
+  mutate(
+    G_cap = as.integer(sub("^N:\\s*", "", as.character(N))),
+    G_max = factor(
+      paste("Gmax:", comma(G_cap)),
+      levels = paste("Gmax:", comma(sort(unique(G_cap))))
+    )
+  )
+
+cluster_cap_colors <- cluster_cap_palette(levels(sample_efficiency_df$G_max))
 
 ## Appendix Figure 3 ----------------------------------------------------------
 
 suppressWarnings({
 
-  # Plot mean sample size savings induced by early stopping
+  # Plot mean respondent-cluster savings induced by early stopping
 
   early_stopping_sample_plot <- ggplot(
       sample_efficiency_df,
@@ -29,7 +38,7 @@ suppressWarnings({
         y = p_sample_save,
         ymin = p_sample_save_lb,
         ymax = p_sample_save_ub,
-        color = N
+        color = G_max
       )
     ) +
     geom_line(linewidth = 0.5, alpha = 0.3) +
@@ -54,11 +63,11 @@ suppressWarnings({
     scale_y_continuous(labels = percent, limits = c(0, 1)) +
     labs(
       x = "AMCE",
-      y = "Mean sample saved (%)",
+      y = "Mean clusters saved (%)",
       color = ""
     ) +
-    theme_minimal() +
-    scale_color_viridis(discrete = TRUE) +
+    conjoint_theme() +
+    scale_color_manual(values = cluster_cap_colors) +
     theme(plot.title = element_text(hjust = 0.5, face = "bold"))
 
   # Plot probability of early stopping by AMCE (effect size)
@@ -70,7 +79,7 @@ suppressWarnings({
       y = p_early,
       ymin = p_early_lb,
       ymax = p_early_ub,
-      color = N
+      color = G_max
     )
   ) +
     geom_point(alpha = 0.3, size = 0.6) +
@@ -94,13 +103,12 @@ suppressWarnings({
     ) +
     labs(
       x = "AMCE",
-      y = "**Pr(** Early Stopping **)**"
+      y = "Pr(early stopping)"
     ) +
-    theme_minimal() +
-    scale_color_viridis(discrete = TRUE) +
+    conjoint_theme() +
+    scale_color_manual(values = cluster_cap_colors) +
     guides(color = "none") +
     theme(
-      axis.title.y = element_markdown(),
       plot.title = element_text(hjust = 0.5, face = "bold")
     )
 
@@ -127,7 +135,7 @@ annot_amce <- 0.05
 
 # Pull the nearest observed point for each panel
 annot_df <- sample_efficiency_df |>
-  filter(n_lev == "Attribute levels: 6", N == glue("N: {annot_n}")) |>
+  filter(n_lev == "Attribute levels: 6", G_cap == annot_n) |>
   mutate(dist = abs(amce - annot_amce)) |>
   arrange(dist) |>
   slice(1)
@@ -138,14 +146,14 @@ annot_p_save <- round(annot_df$p_sample_save[[1]], 2)
 annot_n_save <- signif(annot_n * annot_p_save, digits = 2)
 
 annot_label_early <- glue(
-  "At N = {comma(annot_n)} and AMCE = {number(annot_df$amce[[1]], accuracy = 0.01)},\n",
+  "At Gmax = {comma(annot_n)} and AMCE = {number(annot_df$amce[[1]], accuracy = 0.01)},\n",
   "Pr(early stopping) = {percent(annot_p_early, accuracy = 1)}"
 )
 
 annot_label_save <- glue(
-  "At N = {comma(annot_n)} and AMCE = {number(annot_df$amce[[1]], accuracy = 0.01)}, ",
-  "mean\nsample saved = {percent(annot_p_save, accuracy = 1)} ",
-  "(about N = {comma(annot_n_save)})"
+  "Gmax = {comma(annot_n)}, AMCE = {number(annot_df$amce[[1]], accuracy = 0.01)}\n",
+  "Mean saved = {percent(annot_p_save, accuracy = 1)}\n",
+  "(about {comma(annot_n_save)} clusters)"
 )
 
 suppressWarnings({
@@ -156,7 +164,7 @@ suppressWarnings({
         y = p_sample_save,
         ymin = p_sample_save_lb,
         ymax = p_sample_save_ub,
-        color = N
+        color = G_max
       )
     ) +
     geom_line(linewidth = 0.5, alpha = 0.3) +
@@ -179,7 +187,7 @@ suppressWarnings({
       curvature = -0.25,
       arrow = arrow(length = unit(0.015, "npc")),
       linewidth = 0.4,
-      color = "black"
+      color = paper_colors$reference
     ) +
     annotate(
       "text",
@@ -201,11 +209,11 @@ suppressWarnings({
     scale_y_continuous(labels = percent, limits = c(0, 1)) +
     labs(
       x = "AMCE",
-      y = "Mean sample saved (%)",
+      y = "Mean clusters saved (%)",
       color = ""
     ) +
-    theme_minimal() +
-    scale_color_viridis(discrete = TRUE) +
+    conjoint_theme() +
+    scale_color_manual(values = cluster_cap_colors) +
     theme(plot.title = element_text(hjust = 0.5, face = "bold"))
 
   sample_efficiency_pr_plot <- ggplot(
@@ -215,7 +223,7 @@ suppressWarnings({
       y = p_early,
       ymin = p_early_lb,
       ymax = p_early_ub,
-      color = N
+      color = G_max
     )
   ) +
     geom_point(alpha = 0.3, size = 0.6) +
@@ -238,7 +246,7 @@ suppressWarnings({
       curvature = -0.25,
       arrow = arrow(length = unit(0.015, "npc")),
       linewidth = 0.4,
-      color = "black"
+      color = paper_colors$reference
     ) +
     annotate(
       "text",
@@ -259,13 +267,12 @@ suppressWarnings({
     ) +
     labs(
       x = "AMCE",
-      y = "**Pr(** Early Stopping **)**"
+      y = "Pr(early stopping)"
     ) +
-    theme_minimal() +
-    scale_color_viridis(discrete = TRUE) +
+    conjoint_theme() +
+    scale_color_manual(values = cluster_cap_colors) +
     guides(color = "none") +
     theme(
-      axis.title.y = element_markdown(),
       plot.title = element_text(hjust = 0.5, face = "bold")
     )
 
