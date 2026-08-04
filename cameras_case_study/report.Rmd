@@ -1,0 +1,238 @@
+---
+title: "Anytime-Valid Conjoint Analysis: A Digital-Camera Case Study"
+subtitle: "Supplementary case study for *Anytime-Valid Inference in Conjoint Experiments* (Molitor, Gosciak, and Lindon, 2026)"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  pdf_document:
+    number_sections: true
+    fig_caption: true
+geometry: margin=1in
+fontsize: 11pt
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.align = "center")
+
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(ggplot2)
+  library(readr)
+  library(here)
+})
+
+meta <- read_csv(here("cameras_case_study", "data", "meta.csv"), show_col_types = FALSE)
+final_comparison <- read_csv(here("cameras_case_study", "data", "final_comparison.csv"), show_col_types = FALSE)
+sequential_estimates <- read_csv(here("cameras_case_study", "data", "sequential_av_estimates.csv"), show_col_types = FALSE)
+camera_long <- read_csv(here("cameras_case_study", "data", "camera_long.csv"), show_col_types = FALSE)
+
+term_labels <- c(
+  canon     = "Canon",
+  sony      = "Sony",
+  nikon     = "Nikon",
+  panasonic = "Panasonic",
+  pixels    = "Higher pixel count",
+  zoom      = "Higher zoom",
+  video     = "Video capability",
+  swivel    = "Swivel display",
+  wifi      = "WiFi",
+  price     = "Price (USD 100s)"
+)
+term_order <- names(term_labels)
+
+sequential_estimates <- sequential_estimates |>
+  mutate(label = factor(term_labels[term], levels = term_labels[term_order]))
+
+final_comparison <- final_comparison |>
+  mutate(
+    label  = factor(term_labels[term], levels = rev(term_labels[term_order])),
+    method = factor(method, levels = c("Conventional (fixed-n)", "Anytime-valid (CS)"))
+  )
+```
+
+# Introduction
+
+The parent paper establishes anytime-valid e-values and confidence sequences
+(CSs) for the linear-probability ("AMCE") model of conjoint analysis, and
+demonstrates their properties through simulation. This note complements those
+simulations with a case study on a real conjoint dataset: a discrete-choice
+survey of digital camera preferences. The goal is to show what the method
+looks like end-to-end on real data -- in particular, how the confidence
+sequence and e-value for each attribute effect evolve as respondents
+accumulate, and how the final anytime-valid interval compares to the
+conventional fixed-$n$ interval computed from the same fitted model.
+
+All code, data, and figures for this case study live in
+`cameras_case_study/` and can be regenerated with `run_all.sh`; see the
+accompanying `README.md` for exact reproduction steps.
+
+# Data
+
+We use the `camera` dataset distributed with the R package **bayesm**
+(Rossi, 2023), a panel conjoint survey of digital camera preferences from
+Allenby, Brazell, Howell, and Rossi (2014a, 2014b); see also Case Study 4 in
+Rossi, Allenby, and McCulloch, *Bayesian Statistics and Marketing*. The
+dataset contains `r meta$G_total` respondents, each of whom completed 16
+choice tasks. In every task the respondent chose among 4 camera profiles plus
+an explicit outside ("none of these") option, for
+`r format(meta$n_obs, big.mark = ",")` respondent-task-alternative rows in
+total. Each profile is described by four mutually-exclusive brand indicators
+(Canon, Sony, Nikon, Panasonic -- the outside option has all four set to
+zero), five binary feature indicators (higher pixel count, higher zoom, video
+capability, swivel display, WiFi), and price in hundreds of US dollars.
+
+We treat each of the `r meta$G_total` respondents as a cluster, exactly as in
+the simulations in the main paper, and fit
+
+$$
+\texttt{chosen} \sim \texttt{canon} + \texttt{sony} + \texttt{nikon} + \texttt{panasonic} +
+\texttt{pixels} + \texttt{zoom} + \texttt{video} + \texttt{swivel} + \texttt{wifi} + \texttt{price}
+$$
+
+as a linear probability model via `feols()`, clustering standard errors by
+respondent. Each non-intercept coefficient is an AMCE: the average marginal
+effect of that attribute on the probability a profile is chosen, relative to
+the outside option.
+
+# Method
+
+Point estimates and cluster-robust ("CRV1") standard errors come directly
+from `feols()`. Anytime-valid p-values and confidence-sequence radii are then
+computed from those same estimates using the e-value construction of the
+parent paper, with the reference degrees of freedom and the process index
+both set to $G - 1$ and $G$ respectively, where $G$ is the number of clusters
+observed so far -- not the row count -- since clusters, not rows, are the
+unit that accumulates sequentially here.
+
+The tuning parameter $g$, which controls the shape of the confidence
+sequence, is fixed once in advance at the value that minimizes the CS radius
+at the dataset's actual final size, $G = `r meta$G_total`$ (close to the
+$\sim 300$ clusters expected going in). This gives $g^\star =
+`r sprintf("%.2f", meta$g_star)`$. Critically, $g^\star$ is computed once from
+the planned final sample size and held fixed throughout sequential
+monitoring below; re-optimizing $g$ as data accumulate would invalidate the
+anytime-valid guarantee, since $g$ would then depend on how the monitoring
+unfolds.
+
+All significance levels below use $\alpha = `r meta$alpha`$.
+
+# Results
+
+## Confidence sequences over time
+
+```{r fig-cs, fig.width=7, fig.height=8.5, fig.cap="Anytime-valid 95\\% confidence sequence for each AMCE as respondents accumulate. Shaded regions clipped at $\\pm 1$; very early on (roughly $G<18$) the true radius is unbounded, which is expected: a confidence sequence must sometimes be uninformative to guarantee valid coverage at every sample size, not just at a single pre-planned $n$."}
+cs_cap <- 1
+
+ggplot(
+  sequential_estimates |>
+    mutate(
+      conf.low  = pmax(conf.low, -cs_cap),
+      conf.high = pmin(conf.high, cs_cap)
+    ),
+  aes(x = G, y = estimate, ymin = conf.low, ymax = conf.high)
+) +
+  geom_ribbon(alpha = 0.25, fill = "#2C7FB8") +
+  geom_line(color = "#2C7FB8", linewidth = 0.4) +
+  geom_hline(yintercept = 0, linetype = "dotted", color = "grey30") +
+  coord_cartesian(ylim = c(-cs_cap, cs_cap)) +
+  facet_wrap(~label, ncol = 2) +
+  labs(
+    x = "Respondents observed (G)",
+    y = "AMCE estimate, with 95% confidence sequence"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(panel.grid.minor = element_blank(), strip.text = element_text(face = "bold"))
+```
+
+Figure \ref{fig:fig-cs} shows every attribute's confidence sequence
+narrowing steadily as more respondents are observed, while remaining valid to
+inspect at any point along the way -- there is no multiple-looks penalty for
+having watched the price effect firm up over the first hundred or so
+respondents before checking in on swivel display or WiFi.
+
+## e-values over time
+
+```{r fig-evalues, fig.width=7, fig.height=8.5, fig.cap="Anytime-valid e-value for each AMCE as respondents accumulate (log scale). The dashed red line is $1/\\alpha$, the threshold an e-value must cross to reject the null of no effect at level $\\alpha$; the dotted grey line is $e=1$ (neutral evidence)."}
+ggplot(sequential_estimates, aes(x = G, y = e_value)) +
+  geom_line(color = "#D95F02", linewidth = 0.4) +
+  geom_hline(yintercept = 1 / meta$alpha, linetype = "dashed", color = "red") +
+  geom_hline(yintercept = 1, linetype = "dotted", color = "grey40") +
+  scale_y_log10() +
+  facet_wrap(~label, ncol = 2, scales = "free_y") +
+  labs(
+    x = "Respondents observed (G)",
+    y = "Anytime-valid e-value (log scale)"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(panel.grid.minor = element_blank(), strip.text = element_text(face = "bold"))
+```
+
+Figure \ref{fig:fig-evalues} shows the corresponding e-value trajectories.
+Every attribute's e-value exceeds the $1/\alpha$ rejection threshold by the
+end of the sample, i.e. every AMCE in this study is detectably different
+from zero given the full sample. The number of respondents needed to first
+cross that threshold varies substantially across attributes, from 25 for
+price to 110 for the weakest brand effect (Panasonic) -- under a third of
+the full sample even in the slowest case. The trajectories are not always
+monotonic once above the threshold (Panasonic and Sony both dip back below
+it after their first crossing); this is expected of e-processes and is
+harmless under the relevant decision rule, which is to stop and reject the
+very first time the threshold is crossed, rather than requiring it to stay
+crossed forever.
+
+## Fixed-$n$ interval vs. confidence sequence, at the final sample size
+
+```{r fig-final, fig.width=6.5, fig.height=4.5, fig.cap=sprintf("Final AMCE point estimate with a conventional fixed-$n$ 95\\%% confidence interval versus the anytime-valid 95\\%% confidence sequence, both computed from the same final model fit ($G = %d$).", meta$G_total)}
+ggplot(
+  final_comparison,
+  aes(x = label, y = estimate, ymin = conf.low, ymax = conf.high, color = method)
+) +
+  geom_hline(yintercept = 0, linetype = "dotted", color = "grey40") +
+  geom_pointrange(position = position_dodge(width = 0.5), size = 0.4) +
+  coord_flip() +
+  scale_color_manual(values = c(
+    "Conventional (fixed-n)" = "grey40",
+    "Anytime-valid (CS)"     = "#2C7FB8"
+  )) +
+  labs(x = NULL, y = "AMCE estimate (95% interval)", color = NULL) +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom", panel.grid.minor = element_blank())
+```
+
+Figure \ref{fig:fig-final} makes explicit the price of anytime validity at a
+single, fixed sample size: the two methods share the same point estimate
+(they are computed from the same model fit), but the confidence sequence is
+visibly wider than the conventional interval for every AMCE. That extra width
+is exactly what buys the ability to monitor the study continuously, as in
+Figures \ref{fig:fig-cs} and \ref{fig:fig-evalues}, and still report a valid
+interval or rejection decision at whatever point the analyst chooses to stop
+-- something the conventional interval does not license.
+
+# Discussion
+
+On this real conjoint dataset, every attribute -- four camera brands, five
+features, and price -- has a confidence sequence that excludes zero and an
+e-value that comfortably clears the rejection threshold by the end of data
+collection, and the point estimates agree with intuition (all brands and
+features increase choice probability relative to the outside option; price
+decreases it). The case study illustrates the two costs and benefits of the
+anytime-valid approach side by side: wider intervals at any fixed sample
+size, in exchange for validity at every sample size, including whichever one
+an analyst actually decides to stop at.
+
+# References
+
+- Allenby, G., Brazell, J., Howell, J., and Rossi, P. (2014a). Economic
+  Valuation of Product Features. *Quantitative Marketing and Economics*,
+  12, 421-456.
+- Allenby, G., Brazell, J., Howell, J., and Rossi, P. (2014b). Valuation of
+  Patented Product Features. *Journal of Law and Economics*, 57, 629-663.
+- Rossi, P., Allenby, G., and McCulloch, R. *Bayesian Statistics and
+  Marketing*. Case Study 4.
+- Rossi, P. (2023). bayesm: Bayesian Inference for Marketing/Micro-Econometrics.
+  R package.
+- Lindon, M., Ham, D., Tingley, M., and Bojinov, I. (2026). Anytime-valid
+  linear models and regression adjusted causal inference in randomized
+  experiments. *Journal of the American Statistical Association*.
+  arXiv:2210.08589.
+- Molitor, D., Gosciak, J., and Lindon, M. (2026). Anytime-Valid Inference in
+  Conjoint Experiments.

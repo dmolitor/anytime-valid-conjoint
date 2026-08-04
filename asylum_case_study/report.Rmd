@@ -1,0 +1,526 @@
+---
+title: "Anytime-Valid Conjoint Analysis: A European Asylum-Seeker Case Study"
+subtitle: "Supplementary case study for *Anytime-Valid Inference in Conjoint Experiments* (Molitor, Gosciak, and Lindon, 2026)"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  pdf_document:
+    number_sections: true
+    fig_caption: true
+geometry: margin=1in
+fontsize: 11pt
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.align = "center")
+
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(tidyr)
+  library(ggplot2)
+  library(readr)
+  library(here)
+  library(knitr)
+})
+
+meta <- read_csv(here("asylum_case_study", "data", "meta.csv"), show_col_types = FALSE)
+final_comparison <- read_csv(here("asylum_case_study", "data", "final_comparison.csv"), show_col_types = FALSE)
+sequential_estimates <- read_csv(here("asylum_case_study", "data", "sequential_av_estimates.csv"), show_col_types = FALSE)
+
+alpha <- meta$alpha
+threshold <- 1 / alpha
+
+## ---- Attribute bookkeeping -------------------------------------------------
+
+attribute_display <- c(
+  cconsist  = "Testimony consistency",
+  cgender   = "Gender",
+  corigin   = "Country of origin",
+  cage      = "Age",
+  cjob      = "Previous occupation",
+  cvulner   = "Vulnerability",
+  creason   = "Reason for migrating",
+  creligion = "Religion",
+  clang     = "Language skills"
+)
+attribute_vars <- names(attribute_display)
+
+# Alphabetically-first level per attribute -- R's default factor() ordering,
+# used (and independently verified against the raw data) as the reference
+# level for every attribute below.
+baseline_level <- c(
+  cconsist  = "Major inconsistencies",
+  cgender   = "Female",
+  corigin   = "Afghanistan",
+  cage      = "21 Years",
+  cjob      = "Accountant",
+  cvulner   = "Handicapped",
+  creason   = "Economic opportunities",
+  creligion = "Agnostic",
+  clang     = "Broken"
+)
+
+term_attribute <- function(term) {
+  attribute_vars[vapply(attribute_vars, function(a) startsWith(term, a), logical(1))][1]
+}
+
+all_terms <- final_comparison |> distinct(term) |> pull(term)
+term_attr_map <- vapply(all_terms, term_attribute, character(1))
+term_level_map <- substring(all_terms, nchar(term_attr_map) + 1)
+term_labels <- setNames(paste0(attribute_display[term_attr_map], ": ", term_level_map), all_terms)
+term_order <- all_terms
+
+stopifnot(length(all_terms) == 27, !anyNA(term_attr_map))
+
+sequential_estimates <- sequential_estimates |>
+  mutate(label = factor(term_labels[term], levels = term_labels[term_order]))
+
+final_comparison <- final_comparison |>
+  mutate(
+    label  = factor(term_labels[term], levels = rev(term_labels[term_order])),
+    method = factor(method, levels = c("Conventional (fixed-n)", "Anytime-valid (CS)"))
+  )
+
+# Reference table of attributes and levels for the Data section.
+attribute_table <- tibble(attribute = attribute_vars) |>
+  rowwise() |>
+  mutate(
+    Variable = attribute,
+    Attribute = attribute_display[[attribute]],
+    Levels = paste0(
+      baseline_level[[attribute]], " (baseline), ",
+      paste(term_level_map[term_attr_map == attribute], collapse = ", ")
+    )
+  ) |>
+  ungroup() |>
+  select(Variable, Attribute, Levels)
+
+## ---- Curated 9: one coefficient per attribute, for the two over-time figures
+## Rule: within each attribute, the non-baseline level with the largest |t|
+## statistic in the FINAL full-sample fit. sequential_estimates at G == max(G)
+## is exactly that final full-sample fit, since G_total is always included in
+## the sequential grid (see 02_sequential_analysis.R).
+
+final_fit_stats <- sequential_estimates |>
+  filter(G == max(G)) |>
+  mutate(attribute = vapply(term, term_attribute, character(1)))
+stopifnot(max(final_fit_stats$G) == meta$G_total, nrow(final_fit_stats) == length(all_terms))
+
+curated <- final_fit_stats |>
+  group_by(attribute) |>
+  slice_max(abs(statistic), n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  mutate(attribute_label = attribute_display[attribute]) |>
+  arrange(match(attribute, attribute_vars))
+
+curated_terms <- curated$term
+stopifnot(
+  length(curated_terms) == length(attribute_vars),
+  length(unique(curated_terms)) == length(attribute_vars)
+)
+
+sequential_curated <- sequential_estimates |> filter(term %in% curated_terms)
+
+curated_table <- curated |>
+  transmute(
+    Attribute = attribute_label,
+    Level = term_level_map[match(term, all_terms)],
+    Estimate = sprintf("%.3f", estimate),
+    `t statistic` = sprintf("%.1f", statistic)
+  )
+
+## ---- Verified facts used in the prose below --------------------------------
+## (Computed here from the generated CSVs and never hand-typed, per this
+## paper's verification policy for real-data case studies: every specific
+## numeric claim below is checked against actual output, and several are
+## additionally guarded by stopifnot() so the report fails to render, rather
+## than silently stating something false, if the underlying data changes.)
+
+# First G at which each curated term's e-value crosses 1/alpha.
+G_cross_curated <- vapply(curated_terms, function(tm) {
+  sub <- sequential_curated[sequential_curated$term == tm, ]
+  min(sub$G[sub$e_value >= threshold])
+}, numeric(1))
+names(G_cross_curated) <- curated_terms
+stopifnot(all(is.finite(G_cross_curated))) # every curated term crosses eventually
+
+fastest_term <- names(which.min(G_cross_curated))
+slowest_term <- names(which.max(G_cross_curated))
+
+# Non-monotonicity: does e_value dip back below the threshold after its first
+# crossing, for any curated term?
+nonmonotonic_curated <- curated_terms[vapply(curated_terms, function(tm) {
+  sub <- sequential_curated[sequential_curated$term == tm, ]
+  gc <- G_cross_curated[[tm]]
+  any(sub$e_value[sub$G >= gc] < threshold)
+}, logical(1))]
+
+# CS finiteness: t_radius() depends only on (g*, G, alpha), not on the
+# coefficient's own estimate/SE, so every one of the 27 coefficients' bounds
+# should become (and remain) finite at exactly the same G.
+finite_mask <- is.finite(sequential_estimates$conf.low) & is.finite(sequential_estimates$conf.high)
+finiteness_onset <- min(sequential_estimates$G[finite_mask])
+stopifnot(
+  all(sequential_estimates$G[!finite_mask] < finiteness_onset),
+  all(finite_mask[sequential_estimates$G >= finiteness_onset])
+)
+
+# Ribbon cap for Figure 1: chosen larger than every finite bound observed
+# among the curated terms, so the cap only ever clips genuinely-infinite
+# early bounds, never a legitimate finite one.
+cs_cap <- 0.6
+widest_finite <- max(
+  abs(sequential_curated$conf.low[is.finite(sequential_curated$conf.low)]),
+  abs(sequential_curated$conf.high[is.finite(sequential_curated$conf.high)])
+)
+stopifnot(widest_finite <= cs_cap)
+
+# e-value cap for Figure 2: some e-values overflow double-precision floating
+# point (become literally Inf) for very large final test statistics. Exactly
+# one curated term does this, and only in the last portion of the range. The
+# cap (e_cap) is chosen above every finite value reached by the *other* eight
+# curated terms, so it only ever affects that one term's tail.
+curated_inf_terms <- sequential_curated |> filter(is.infinite(e_value)) |> distinct(term) |> pull(term)
+stopifnot(length(curated_inf_terms) == 1, curated_inf_terms == curated$term[curated$attribute == "creason"])
+e_overflow_term <- curated_inf_terms
+e_overflow_label <- term_labels[[e_overflow_term]]
+e_cap <- 1e300
+
+other_curated_max_finite <- max(sequential_curated$e_value[
+  is.finite(sequential_curated$e_value) & sequential_curated$term != e_overflow_term
+])
+stopifnot(other_curated_max_finite < e_cap)
+
+# First G at which the *displayed* (capped) line for e_overflow_term departs
+# from its true value, i.e. first reaches the cap; and, separately, the
+# (later) G at which it becomes literally infinite in double precision.
+e_overflow_onset <- sequential_curated |>
+  filter(term == e_overflow_term, e_value >= e_cap) |>
+  summarize(g = min(G)) |>
+  pull(g)
+e_overflow_inf_onset <- sequential_curated |>
+  filter(term == e_overflow_term, is.infinite(e_value)) |>
+  summarize(g = min(G)) |>
+  pull(g)
+stopifnot(e_overflow_onset <= e_overflow_inf_onset)
+
+# Final-sample significance comparison across all 27 AMCEs: conventional
+# fixed-n vs. anytime-valid, both read off the same final model fit.
+sig_status <- final_comparison |> mutate(excludes_zero = conf.low > 0 | conf.high < 0)
+conv_sig <- sig_status |> filter(method == "Conventional (fixed-n)") |> select(term, conv_sig = excludes_zero)
+av_sig   <- sig_status |> filter(method == "Anytime-valid (CS)")     |> select(term, av_sig = excludes_zero)
+final_wide <- inner_join(conv_sig, av_sig, by = "term")
+stopifnot(nrow(final_wide) == length(all_terms))
+
+n_both_sig    <- sum(final_wide$conv_sig & final_wide$av_sig)
+n_conv_only   <- sum(final_wide$conv_sig & !final_wide$av_sig)
+n_av_only     <- sum(!final_wide$conv_sig & final_wide$av_sig)
+n_neither_sig <- sum(!final_wide$conv_sig & !final_wide$av_sig)
+stopifnot(n_both_sig + n_conv_only + n_av_only + n_neither_sig == length(all_terms))
+
+conv_only_terms <- final_wide$term[final_wide$conv_sig & !final_wide$av_sig]
+neither_terms   <- final_wide$term[!final_wide$conv_sig & !final_wide$av_sig]
+conv_only_labels_text <- paste(term_labels[conv_only_terms], collapse = "; ")
+neither_labels_text   <- paste(term_labels[neither_terms], collapse = "; ")
+
+# Among the conv-only terms, which ones' e-value *ever* crossed the threshold
+# at some earlier G before falling back below it by the final sample?
+conv_only_ever_crossed <- conv_only_terms[vapply(conv_only_terms, function(tm) {
+  any(sequential_estimates$e_value[sequential_estimates$term == tm] >= threshold)
+}, logical(1))]
+conv_only_never_crossed <- setdiff(conv_only_terms, conv_only_ever_crossed)
+```
+
+# Introduction
+
+The parent paper establishes anytime-valid e-values and confidence sequences
+(CSs) for the linear-probability ("AMCE") model of conjoint analysis, and
+demonstrates their properties through simulation. This note is a second
+real-data case study, complementing the digital-camera case study with a
+large-scale political-science conjoint experiment: a forced-choice survey of
+European attitudes toward asylum seekers. Relative to the camera study (332
+respondents, 10 AMCEs from mostly binary attributes), this dataset is a
+stress test of scale and complexity -- `r format(meta$G_total, big.mark = ",")`
+respondents and nine multi-level categorical attributes, producing
+`r length(all_terms)` AMCEs -- and it surfaces real features that the smaller
+camera dataset did not: some coefficients' e-values grow large enough to
+overflow floating point, not every AMCE ends up distinguishable from zero
+even at the full sample, and the conventional and anytime-valid conclusions
+concretely disagree for a handful of attribute levels. All of these are
+reported below exactly as found, verified directly against the generated
+data rather than assumed.
+
+All code, data, and figures for this case study live in
+`asylum_case_study/` and can be regenerated with `run_all.sh`; see the
+accompanying `README.md` for exact reproduction steps.
+
+# Data
+
+We use the 2016 wave of the conjoint experiment from Bansak, Hainmueller, and
+Hangartner (2016), fielded across 15 European countries. Respondents were
+shown pairs of hypothetical asylum-seeker profiles and, in each of 5 tasks,
+forced to choose which of the two profiles they would prefer to see admitted.
+Each profile was described by nine randomized attributes. The specific CSV
+analyzed here was released as part of the replication archive for a related
+follow-up study, Bansak, Hainmueller, and Hangartner (2023), via Harvard
+Dataverse (see References); that archive is the provenance of this file, while
+the study design and this wave of data originate in the 2016 paper.
+
+The raw file contains 180,300 rows (18,030 respondents $\times$ 5 tasks
+$\times$ 2 profiles). Nine respondents (90 rows) have every one of the nine
+attribute columns missing -- corrupted, incomplete records -- and are dropped;
+no other rows have any missing attribute. After cleaning,
+`r format(meta$G_total, big.mark = ",")` respondents remain, contributing
+`r format(meta$n_obs, big.mark = ",")` rows in total (10 rows per respondent:
+5 tasks $\times$ 2 profiles), with every respondent's rows verified to be
+complete and every task a genuine forced choice (exactly one of the two
+profiles preferred). We treat each respondent as a cluster, exactly as in the
+simulations in the main paper and in the camera case study.
+
+The nine attributes, converted to factors before fitting, are:
+
+```{r attribute-table, results='asis'}
+cat(paste0(
+  "- **", attribute_table$Attribute, "** (`", attribute_table$Variable, "`): ",
+  attribute_table$Levels
+), sep = "\n")
+```
+
+The first-listed (alphabetically first) level of each attribute is the
+reference level against which its AMCEs are measured, R's default `factor()`
+convention. We fit
+
+$$
+\texttt{pref} \sim \texttt{cconsist}+\texttt{cgender}+\texttt{corigin}+\texttt{cage}+\texttt{cjob}+\texttt{cvulner}+\texttt{creason}+\texttt{creligion}+\texttt{clang}
+$$
+
+as a linear probability model via `feols()`, clustering standard errors by
+respondent (`ResponseId`). Each of the `r length(all_terms)` non-intercept
+coefficients is an AMCE: the average marginal effect of that attribute level,
+relative to its attribute's baseline, on the probability a profile is
+preferred.
+
+# Method
+
+Point estimates and cluster-robust ("CRV1") standard errors come directly
+from `feols()`. Anytime-valid p-values and confidence-sequence radii are then
+computed from those same estimates using the e-value construction of the
+parent paper, with the reference degrees of freedom and the process index
+both set to $G - 1$ and $G$ respectively, where $G$ is the number of clusters
+(respondents) observed so far -- not the row count -- since clusters, not
+rows, are the unit that accumulates sequentially here.
+
+The tuning parameter $g$, which controls the shape of the confidence
+sequence, is fixed once in advance at the value that minimizes the CS radius
+at the dataset's actual final size, $G = `r format(meta$G_total, big.mark=",")`$.
+This gives $g^\star = `r sprintf("%.2f", meta$g_star)`$. Critically,
+$g^\star$ is computed once from the final sample size and held fixed
+throughout sequential monitoring below; re-optimizing $g$ as data accumulate
+would invalidate the anytime-valid guarantee, since $g$ would then depend on
+how the monitoring unfolds. All significance levels below use
+$\alpha = `r meta$alpha`$, so the e-value rejection threshold is
+$1/\alpha = `r threshold`$.
+
+Refitting at every single respondent, as the smaller camera case study does,
+is unnecessary here and costly at this scale: with
+`r format(meta$G_total, big.mark=",")` respondents that would mean roughly
+that many `feols()` calls plus as many `dplyr::filter()` passes over a
+180,000-row frame. A short timing test (fits spread across the full range of
+$G$, including the filtering step) measured roughly 0.02-0.13 seconds per
+fit, growing mildly with $G$. We therefore step the sequential refit by 100
+respondents, giving `r meta$n_fits` total fits from $G=5$ up to
+$G = `r format(meta$G_total, big.mark=",")`$ (the final value is always
+included, so the last sequential fit exactly reproduces the final fit below)
+-- comfortably within the targeted 150-400 refits, and measured at
+`r sprintf("%.0f", meta$elapsed_sec)` seconds of actual runtime, well inside
+a 3-minute budget.
+
+With `r length(all_terms)` non-baseline coefficients across nine attributes,
+faceting every coefficient in the two over-time figures below (confidence
+sequences and e-values, Figures \ref{fig:fig-cs} and \ref{fig:fig-evalues})
+would be unreadable. For those two figures only, we curate exactly one
+representative coefficient per attribute, chosen by an objective, pre-specifiable
+rule: **the non-baseline level with the largest $|t|$ statistic in the final
+full-sample fit, within each attribute**. All `r length(all_terms)`
+non-intercept coefficients are retained in the underlying data
+(`final_comparison.csv`, `sequential_av_estimates.csv`) and in Figure
+\ref{fig:fig-final}; only Figures \ref{fig:fig-cs} and \ref{fig:fig-evalues}
+are curated for readability. The nine coefficients this rule selects are:
+
+```{r curated-table}
+kable(curated_table, align = c("l", "l", "r", "r"))
+```
+
+# Results
+
+## Confidence sequences over time
+
+```{r fig-cs, fig.width=7, fig.height=7.3, fig.cap=sprintf("Anytime-valid 95\\%% confidence sequence for the nine curated AMCEs (one per attribute; see Method) as respondents accumulate. Shaded regions are clipped at $\\pm%.1f$, which is wider than every finite bound in the data (the widest is %.3f in absolute value) -- so the clip affects only genuinely-infinite early bounds, never a legitimate finite one. Below $G=%d$, the confidence-sequence radius is infinite for \\textit{every} one of the %d coefficients in this dataset, curated or not, since the radius depends only on $G$, $g^\\star$, and $\\alpha$ -- not on the coefficient's own estimate -- and is expected: a confidence sequence must sometimes be uninformative to guarantee valid coverage at every sample size, not just a single pre-planned $n$.", cs_cap, widest_finite, finiteness_onset, length(all_terms))}
+ggplot(
+  sequential_curated |>
+    mutate(
+      conf.low  = pmax(conf.low, -cs_cap),
+      conf.high = pmin(conf.high, cs_cap)
+    ),
+  aes(x = G, y = estimate, ymin = conf.low, ymax = conf.high)
+) +
+  geom_ribbon(alpha = 0.25, fill = "#2C7FB8") +
+  geom_line(color = "#2C7FB8", linewidth = 0.4) +
+  geom_hline(yintercept = 0, linetype = "dotted", color = "grey30") +
+  coord_cartesian(ylim = c(-cs_cap, cs_cap)) +
+  facet_wrap(~label, ncol = 2) +
+  labs(
+    x = "Respondents observed (G)",
+    y = "AMCE estimate, with 95% confidence sequence"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(panel.grid.minor = element_blank(), strip.text = element_text(face = "bold"))
+```
+
+Figure \ref{fig:fig-cs} shows each curated attribute's confidence sequence
+narrowing steadily as more respondents are observed, while remaining valid to
+inspect at any point along the way -- there is no multiple-looks penalty for
+having watched, say, testimony consistency firm up over the first thousand or
+so respondents before checking in on country of origin or religion.
+
+## e-values over time
+
+```{r fig-evalues, fig.width=7, fig.height=7.3, fig.cap=sprintf("Anytime-valid e-value for the same nine curated AMCEs as respondents accumulate (log scale). The dashed red line is $1/\\alpha=%d$, the threshold an e-value must cross to reject the null of no effect at level $\\alpha$; the dotted grey line is $e=1$ (neutral evidence). e-values are capped at $10^{300}$ for display, which affects only %s: from $G=%s$ its true e-value exceeds $10^{300}$, and from $G=%s$ onward it exceeds the range representable in double-precision floating point altogether (i.e., is exactly infinite); both are shown at the display cap. The underlying CSV retains the true, uncapped ($\\infty$) values throughout.", threshold, e_overflow_label, format(e_overflow_onset, big.mark=","), format(e_overflow_inf_onset, big.mark=","))}
+ggplot(
+  sequential_curated |> mutate(e_value = pmin(e_value, e_cap)),
+  aes(x = G, y = e_value)
+) +
+  geom_line(color = "#D95F02", linewidth = 0.4) +
+  geom_hline(yintercept = threshold, linetype = "dashed", color = "red") +
+  geom_hline(yintercept = 1, linetype = "dotted", color = "grey40") +
+  scale_y_log10() +
+  facet_wrap(~label, ncol = 2, scales = "free_y") +
+  labs(
+    x = "Respondents observed (G)",
+    y = "Anytime-valid e-value (log scale)"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(panel.grid.minor = element_blank(), strip.text = element_text(face = "bold"))
+```
+
+Figure \ref{fig:fig-evalues} shows the corresponding e-value trajectories.
+Every one of the nine curated e-values exceeds the $1/\alpha$ rejection
+threshold by the end of the sample. The number of respondents needed to first
+cross that threshold varies enormously across attributes: from
+`r format(G_cross_curated[[fastest_term]], big.mark=",")` for
+*`r term_labels[[fastest_term]]`* up to
+`r format(G_cross_curated[[slowest_term]], big.mark=",")` for
+*`r term_labels[[slowest_term]]`* -- a much wider range than the camera case
+study's 25-110, reflecting both weaker effects and a far larger $g^\star$
+here, which shrinks early evidence more aggressively. As in the camera study,
+crossing need not be permanent: `r length(nonmonotonic_curated)` of the nine
+curated e-values
+(*`r paste(term_labels[nonmonotonic_curated], collapse = "* and *")`*) dip
+back below the threshold at least once after their first crossing. This is
+expected of e-processes and is harmless under the relevant decision rule --
+stop and reject the first time the threshold is crossed, rather than
+requiring it to stay crossed forever.
+
+Not shown in Figure \ref{fig:fig-evalues}, but visible in the full comparison
+below: the curated nine are the *strongest* AMCE per attribute by
+construction, and not every one of the `r length(all_terms)` AMCEs in this
+study reaches the rejection threshold, even with the full sample.
+
+## Fixed-$n$ interval vs. confidence sequence, at the final sample size
+
+```{r fig-final, fig.width=7.5, fig.height=7.8, fig.cap=sprintf("Final AMCE point estimate with a conventional fixed-$n$ 95\\%% confidence interval versus the anytime-valid 95\\%% confidence sequence, for all %d AMCEs, both computed from the same final model fit ($G = %s$).", length(all_terms), format(meta$G_total, big.mark=","))}
+ggplot(
+  final_comparison,
+  aes(x = label, y = estimate, ymin = conf.low, ymax = conf.high, color = method)
+) +
+  geom_hline(yintercept = 0, linetype = "dotted", color = "grey40") +
+  geom_pointrange(position = position_dodge(width = 0.5), size = 0.35, linewidth = 0.5) +
+  coord_flip() +
+  scale_color_manual(values = c(
+    "Conventional (fixed-n)" = "grey40",
+    "Anytime-valid (CS)"     = "#2C7FB8"
+  )) +
+  labs(x = NULL, y = "AMCE estimate (95% interval)", color = NULL) +
+  theme_minimal(base_size = 10) +
+  theme(legend.position = "bottom", panel.grid.minor = element_blank())
+```
+
+Figure \ref{fig:fig-final} makes explicit the price of anytime validity at a
+single, fixed sample size: the two methods share the same point estimate
+(they are computed from the same model fit), but the confidence sequence is
+visibly wider than the conventional interval for every AMCE. Concretely,
+both intervals exclude zero for `r n_both_sig` of the `r length(all_terms)`
+AMCEs, and for none does the anytime-valid interval exclude zero while the
+conventional interval does not -- consistent with the anytime-valid interval
+never being narrower here. But `r n_conv_only` AMCEs
+(*`r conv_only_labels_text`*) are flagged as distinguishable from zero by the
+conventional fixed-$n$ interval while the anytime-valid confidence sequence
+still contains zero, and a further `r n_neither_sig`
+(*`r neither_labels_text`*) are indistinguishable from zero under either
+method. That extra width purchased by the anytime-valid interval is exactly
+what buys the ability to monitor the study continuously, as in Figures
+\ref{fig:fig-cs} and \ref{fig:fig-evalues}, and still report a valid interval
+or rejection decision at whatever point the analyst chooses to stop --
+something the conventional interval does not license.
+
+# Discussion
+
+On this large, real conjoint dataset, the anytime-valid method continues to
+behave exactly as the parent paper's theory predicts: confidence sequences
+that are valid to inspect continuously, at the cost of extra width relative
+to a conventional interval computed once at a fixed sample size. Two features
+of this particular dataset are worth drawing out because they did not appear
+in the smaller camera case study.
+
+First, not every AMCE is distinguishable from zero, even with
+`r format(meta$G_total, big.mark=",")` respondents. Of the
+`r n_conv_only` AMCEs that the conventional interval alone flags --
+`r conv_only_labels_text` -- `r length(conv_only_ever_crossed)` (namely
+*`r paste(term_labels[conv_only_ever_crossed], collapse = "* and *")`*) did
+cross the anytime-valid rejection threshold at some earlier point in
+sequential monitoring before falling back below it by the end, illustrating
+concretely why a rule that only checks significance once, at a pre-committed
+$n$, is not the same rule as one that must remain valid at every $n$ an
+analyst might stop at: an analyst free to stop the moment either of these
+crossed would have "found" a significant effect under the conventional
+logic, but that finding would not have survived to the final sample, and the
+anytime-valid procedure never licenses treating it as a discovery in the
+first place. `r length(conv_only_never_crossed)` more
+(*`r paste(term_labels[conv_only_never_crossed], collapse = "* and *")`*)
+never cross the anytime-valid threshold at all in this dataset, despite the
+conventional interval excluding zero throughout. A further
+`r n_neither_sig` AMCEs (*`r neither_labels_text`*) are not distinguishable
+from zero under either method. All of this is a substantive as well as a
+statistical observation: several country-of-origin effects (relative to the
+Afghanistan baseline) and one age contrast are genuinely small and hard to
+pin down even at this scale, in contrast to the uniformly large, easily
+detected effects of testimony consistency, reason for migration, and
+vulnerability that dominate Figure \ref{fig:fig-final}, echoing the original
+Bansak et al. (2016) finding that humanitarian concerns dominate
+European asylum preferences.
+
+Second, this dataset shows what the anytime-valid math looks like at the
+edge of floating-point range. With `r format(meta$G_total, big.mark=",")`
+clusters and some very large effects, several e-values grow large enough to
+overflow to $\infty$ in double precision well before the study ends (see
+Figure \ref{fig:fig-evalues}'s caption); the underlying data preserve the
+true (infinite) values, and only the figure's display is capped. This did
+not arise in the smaller camera case study and is a reminder that
+"e-value $=\infty$" is not a bug but the expected behavior of an e-process
+once evidence for a real, large, and precisely-estimated effect becomes
+overwhelming.
+
+# References
+
+- Bansak, K., Hainmueller, J., and Hangartner, D. (2016). How economic,
+  humanitarian, and religious concerns shape European attitudes toward
+  asylum seekers. *Science*, 354(6309), 217-222.
+- Bansak, K., Hainmueller, J., and Hangartner, D. (2023). Europeans' support
+  for refugees of varying background is stable over time. *Nature*,
+  620(7975), 849-854. Replication data: Harvard Dataverse,
+  doi:10.7910/DVN/FTL1MM.
+- Lindon, M., Ham, D., Tingley, M., and Bojinov, I. (2026). Anytime-valid
+  linear models and regression adjusted causal inference in randomized
+  experiments. *Journal of the American Statistical Association*.
+  arXiv:2210.08589.
+- Molitor, D., Gosciak, J., and Lindon, M. (2026). Anytime-Valid Inference in
+  Conjoint Experiments.

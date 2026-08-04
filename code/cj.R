@@ -1,14 +1,90 @@
 suppressPackageStartupMessages({
-  library(avlm)
   library(broom)
   library(dplyr)
   library(fixest)
   library(ggplot2)
-  library(fixest)
   library(future.apply)
   library(R6)
   library(tidyr)
 })
+
+# Anytime-valid e-value/confidence-sequence math (Lindon, Ham, Tingley & Bojinov,
+# JASA 2026 / arXiv:2210.08589). Ported locally so the AV formulas can be applied
+# directly to a fitted `feols` model's own cluster-robust ("CRV1") point estimate
+# and standard error, rather than depending on the `avlm` package.
+#
+# Per Cameron, Gelbach & Miller (2011), when standard errors are cluster-robust,
+# the reference distribution for the AV formulas must use nu = G - 1 (clusters
+# minus one) as the denominator degrees of freedom, not n - p (observations
+# minus coefficients). Clusters, not rows, are also the unit that indexes the
+# anytime-valid sequential process itself, so the accumulating sample size in
+# these formulas is G (number of clusters), not the row count.
+
+t_radius <- function(g, G, alpha) {
+  d <- 1
+  nu <- G - 1
+  T <- g / (g + G)
+  powered_term <- (T * alpha^2)^(1 / (nu + d))
+  numerator <- nu * (1 - powered_term)
+  denominator <- max(0, powered_term - T)
+  sqrt(numerator / denominator)
+}
+
+log_G_t <- function(t2, G, g) {
+  nu <- G - 1
+  r <- g / (g + G)
+  0.5 * log(r) + (0.5 * (nu + 1)) * (log(1 + t2 / nu) - log(1 + r * t2 / nu))
+}
+
+p_G_t <- function(log_G_t_values) {
+  pmin(1.0, exp(-log_G_t_values))
+}
+
+# Value of g that minimizes the confidence-sequence radius (t_radius) for a
+# given number of clusters G.
+optimal_g <- function(G, alpha) {
+  if (G <= 1) stop("G must be greater than 1.")
+  if (alpha < 0 || alpha > 1) stop("alpha must be in (0,1).")
+
+  nu <- G - 1
+  upper_bound <- G * alpha^(2 / nu) / (1 - alpha^(2 / nu))
+  lower_bound <- 1
+
+  opt_result <- optimize(
+    t_radius,
+    interval = c(lower_bound, upper_bound),
+    G = G,
+    alpha = alpha
+  )
+  opt_result$minimum
+}
+
+# Tidies a `feols` model's cluster-robust estimate/SE into anytime-valid
+# sequential p-values and confidence-sequence bounds. G (the number of
+# clusters) is the accumulating sample size that indexes anytime-validity here
+# and also fixes the reference degrees of freedom to G - 1. If `g` is not
+# supplied, uses the value that minimizes the confidence-sequence radius.
+av_tidy <- function(model, alpha, cluster, g = NULL) {
+  beta <- coef(model)
+  se <- sqrt(diag(vcov(model)))
+  G <- nlevels(as.factor(cluster))
+  if (is.null(g)) g <- optimal_g(G, alpha)
+
+  t <- beta / se
+  t2 <- t^2
+  p_value <- p_G_t(log_G_t(t2, G, g))
+  radius <- se * t_radius(g, G, alpha)
+
+  tibble::tibble(
+    term = names(beta),
+    estimate = beta,
+    std.error = se,
+    statistic = t,
+    p.value = p_value,
+    conf.low = beta - radius,
+    conf.high = beta + radius
+  )
+}
 
 # This class implements a simple conjoint object. Primarily used for the empirical simulations
 ConjointSim <- R6Class(
@@ -220,8 +296,8 @@ ConjointSim <- R6Class(
 
         cj_tidy <- av_tidy(
           cj_model,
-          g = optimal_g(nrow(cj_data), length(coef(cj_model)), alpha),
-          alpha = alpha
+          alpha = alpha,
+          cluster = cj_data$resp_id
         ) |>
           mutate(i = i) |>
           filter(term != "(Intercept)")

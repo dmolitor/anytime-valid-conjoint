@@ -1,0 +1,411 @@
+---
+title: "Anytime-Valid Conjoint Analysis: A Candidate-Gender Case Study"
+subtitle: "Supplementary case study for *Anytime-Valid Inference in Conjoint Experiments* (Molitor, Gosciak, and Lindon, 2026)"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  pdf_document:
+    number_sections: true
+    fig_caption: true
+geometry: margin=1in
+fontsize: 11pt
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.align = "center")
+
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(ggplot2)
+  library(readr)
+  library(here)
+  library(tibble)
+})
+
+meta <- read_csv(here("candidate_gender_case_study", "data", "meta.csv"), show_col_types = FALSE)
+final_comparison <- read_csv(here("candidate_gender_case_study", "data", "final_comparison.csv"), show_col_types = FALSE)
+sequential_estimates <- read_csv(here("candidate_gender_case_study", "data", "sequential_av_estimates.csv"), show_col_types = FALSE)
+candidate_long <- read_csv(here("candidate_gender_case_study", "data", "candidate_long.csv"), show_col_types = FALSE)
+
+term_labels <- c(
+  orig_1ys         = "1 yr experience (ref: 0 yr)",
+  orig_3ys         = "3 yr experience (ref: 0 yr)",
+  orig_8ys         = "8 yr experience (ref: 0 yr)",
+  orig_FM_sp       = "Spouse: farmer (ref: unmarried)",
+  orig_MD_sp       = "Spouse: doctor (ref: unmarried)",
+  orig_law         = "Occupation: lawyer (ref: teacher)",
+  orig_may         = "Occupation: mayor (ref: teacher)",
+  orig_leg         = "Occupation: legislator (ref: teacher)",
+  orig_1ch         = "1 child (ref: 0)",
+  orig_3ch         = "3 children (ref: 0)",
+  orig_45          = "Age 45 (ref: 29)",
+  orig_65          = "Age 65 (ref: 29)",
+  orig_cand_female = "Candidate is female (ref: male)"
+)
+term_order <- names(term_labels)
+
+sequential_estimates <- sequential_estimates |>
+  mutate(label = factor(term_labels[term], levels = term_labels[term_order]))
+
+final_comparison <- final_comparison |>
+  mutate(
+    label  = factor(term_labels[term], levels = rev(term_labels[term_order])),
+    method = factor(method, levels = c("Conventional (fixed-n)", "Anytime-valid (CS)"))
+  )
+```
+
+```{r stats, include=FALSE}
+# All specific numeric claims made in the prose below are computed here,
+# directly from the generated CSVs, rather than typed in by hand -- see the
+# repository-wide verification discipline: never guess or assume ordering.
+threshold <- 1 / meta$alpha
+
+crossing_summary <- sequential_estimates |>
+  group_by(term, label) |>
+  summarize(
+    first_G = if (any(e_value >= threshold)) min(G[e_value >= threshold]) else NA_real_,
+    .groups = "drop"
+  )
+
+n_cross <- sum(!is.na(crossing_summary$first_G))
+n_terms <- nrow(crossing_summary)
+
+fastest_cross <- crossing_summary |> filter(!is.na(first_G)) |> slice_min(first_G, n = 1)
+slowest_cross <- crossing_summary |> filter(!is.na(first_G)) |> slice_max(first_G, n = 1)
+never_cross   <- crossing_summary |> filter(is.na(first_G))
+
+female_row          <- crossing_summary |> filter(term == "orig_cand_female")
+female_first_G      <- female_row$first_G
+female_pct_of_sample <- 100 * female_first_G / meta$G_total
+female_cross_rank    <- sum(crossing_summary$first_G <= female_first_G, na.rm = TRUE)
+
+female_final    <- final_comparison |> filter(term == "orig_cand_female", method == "Anytime-valid (CS)")
+female_est      <- female_final$estimate
+female_final_e  <- sequential_estimates |> filter(term == "orig_cand_female", G == meta$G_total) |> pull(e_value)
+
+largest_effect <- final_comparison |>
+  filter(method == "Anytime-valid (CS)") |>
+  slice_max(abs(estimate), n = 1)
+
+age65_final <- sequential_estimates |> filter(term == "orig_65", G == meta$G_total)
+
+# Of the attributes that ever cross the threshold, how many dip back below it
+# at least once after their first crossing (expected, harmless e-process
+# behavior under a "stop at first crossing" decision rule)?
+dip_summary <- sequential_estimates |>
+  semi_join(filter(crossing_summary, !is.na(first_G)), by = "term") |>
+  group_by(term) |>
+  arrange(G) |>
+  summarize(
+    fg   = min(G[e_value >= threshold]),
+    dips = any(G > min(G[e_value >= threshold]) & e_value < threshold),
+    .groups = "drop"
+  )
+n_dip <- sum(dip_summary$dips)
+
+n_pairs <- nrow(distinct(candidate_long, responseid, contest))
+
+inf_max_G <- sequential_estimates |>
+  filter(is.infinite(conf.low) | is.infinite(conf.high)) |>
+  summarize(m = max(G)) |>
+  pull(m)
+
+# Formats a large e-value as "m \times 10^{k}" for clean rendering inside
+# LaTeX math mode (plain "6.8e+03" inside $...$ renders with an italicized
+# "e" and spaced-out "+", which reads as a formula rather than a number).
+fmt_e <- function(x) {
+  expo <- floor(log10(x))
+  mant <- x / 10^expo
+  if (round(mant, 1) >= 10) {
+    mant <- mant / 10
+    expo <- expo + 1
+  }
+  sprintf("%.1f \\times 10^{%d}", mant, expo)
+}
+```
+
+# Introduction
+
+The parent paper establishes anytime-valid e-values and confidence sequences
+(CSs) for the linear-probability ("AMCE") model of conjoint analysis, and
+demonstrates their properties through simulation. This note complements
+those simulations, and the companion digital-camera case study, with a case
+study on a real political-science conjoint dataset: a discrete-choice survey
+in which voters were shown pairs of hypothetical political candidates and
+chose which one they would support. The substantive question motivating the
+underlying study -- and the one this case study foregrounds -- is whether a
+candidate's gender affects voter support once other biographical attributes
+are held fixed. As in the companion case study, the goal is to show what the
+anytime-valid method looks like end-to-end on real data: how the confidence
+sequence and e-value for each candidate attribute, especially candidate
+gender, evolve as respondents accumulate, and how the final anytime-valid
+interval compares to the conventional fixed-$n$ interval computed from the
+same fitted model.
+
+All code, data, and figures for this case study live in
+`candidate_gender_case_study/` and can be regenerated with `run_all.sh`; see
+the accompanying `README.md` for exact reproduction steps.
+
+# Data
+
+We use the candidate-choice conjoint experiment of Teele, Kalla, and
+Rosenbluth (2018), fielded to study whether social-role expectations and
+traditionally-gendered biographical traits shape support for female
+political candidates. Respondents were shown pairs of hypothetical candidate
+biographies -- differing in years of political experience, spousal status,
+occupation, number of children, age, and gender -- and asked which candidate
+they would support. The outcome `winner` records whether a given candidate
+profile was the one chosen in its pairwise comparison; this is the AMCE
+outcome used throughout this case study, playing the same role as `chosen`
+in the companion digital-camera case study. Full column definitions and
+provenance are in `data/raw/data_dictionary.csv` and
+`data/raw/dataverse_README.txt`.
+
+The full replication data span both a general-population voter sample and a
+sample of political elites/legislators, as well as a 2017 legislator-only
+replication wave fielded with a modified attribute set. To isolate a single
+clean experimental condition, comparable in spirit to the general-population
+conjoint samples used elsewhere in this paper, we restrict to the original
+2014 wave of the general-population voter sample under the unmodified
+attribute set (`sample == "usa voter" & replication == 0`). The elite/
+legislator sample and the 2017 replication are real parts of the original
+study but out of scope here; see the Discussion for these as natural
+extensions. After this filter, the data comprise
+`r format(meta$G_total, big.mark = ",")` respondents (clusters), each
+completing up to 3 candidate-comparison tasks, for
+`r format(meta$n_obs, big.mark = ",")` respondent-task-candidate rows and
+`r format(n_pairs, big.mark = ",")` valid pairwise comparisons in total.
+
+Each candidate profile is described by five attributes, one-hot encoded in
+the raw data with no reference level omitted: years of political experience
+(0/1/3/8), spousal status (unmarried / married to a farmer / married to a
+doctor), occupation (teacher / lawyer / mayor / legislator), number of
+children (0/1/3), and age (29/45/65) -- plus a sixth, binary attribute, the
+candidate's gender (`orig_cand_female`), which is the attribute of central
+substantive interest for this case study. Because each group's dummies sum
+to 1 in every row, we drop exactly one reference dummy per group before
+fitting (0 years, unmarried, teacher, 0 children, age 29) to avoid perfect
+collinearity with the intercept, leaving 13 non-intercept coefficients.
+
+We treat each of the `r format(meta$G_total, big.mark = ",")` respondents as
+a cluster, exactly as in the simulations in the main paper and in the
+companion camera case study, and fit
+
+$$
+\begin{aligned}
+\texttt{winner} \sim\ & \texttt{orig\_1ys} + \texttt{orig\_3ys} + \texttt{orig\_8ys} + \texttt{orig\_FM\_sp} + \\
+& \texttt{orig\_MD\_sp} + \texttt{orig\_law} + \texttt{orig\_may} + \texttt{orig\_leg} + \\
+& \texttt{orig\_1ch} + \texttt{orig\_3ch} + \texttt{orig\_45} + \texttt{orig\_65} + \texttt{orig\_cand\_female}
+\end{aligned}
+$$
+
+as a linear probability model via `feols()`, clustering standard errors by
+respondent (`responseid`). Each non-intercept coefficient is an AMCE: the
+average marginal effect of that attribute, relative to its dropped reference
+level, on the probability a candidate profile wins its pairwise comparison.
+
+# Method
+
+Point estimates and cluster-robust ("CRV1") standard errors come directly
+from `feols()`. Anytime-valid p-values and confidence-sequence radii are then
+computed from those same estimates using the e-value construction of the
+parent paper, with the reference degrees of freedom and the process index
+both set to $G - 1$ and $G$ respectively, where $G$ is the number of
+clusters (respondents) observed so far -- not the row count -- since
+clusters, not rows, are the unit that accumulates sequentially here.
+
+The tuning parameter $g$, which controls the shape of the confidence
+sequence, is fixed once in advance at the value that minimizes the CS radius
+at the dataset's actual final size, $G = `r format(meta$G_total, big.mark = ",")`$.
+This gives $g^\star = `r sprintf("%.2f", meta$g_star)`$. Critically,
+$g^\star$ is computed once from the planned final sample size and held fixed
+throughout sequential monitoring below; re-optimizing $g$ as data accumulate
+would invalidate the anytime-valid guarantee, since $g$ would then depend on
+how the monitoring unfolds.
+
+All significance levels below use $\alpha = `r meta$alpha`$.
+
+# Results
+
+## Confidence sequences over time
+
+```{r fig-cs, fig.width=7.5, fig.height=7.7, fig.cap=sprintf("Anytime-valid 95\\%% confidence sequence for each AMCE as respondents accumulate. Shaded regions clipped at $\\pm 1$; very early on (roughly $G<%d$) the true radius is unbounded, which is expected: a confidence sequence must sometimes be uninformative to guarantee valid coverage at every sample size, not just at a single pre-planned $n$.", inf_max_G + 1)}
+cs_cap <- 1
+
+ggplot(
+  sequential_estimates |>
+    mutate(
+      conf.low  = pmax(conf.low, -cs_cap),
+      conf.high = pmin(conf.high, cs_cap)
+    ),
+  aes(x = G, y = estimate, ymin = conf.low, ymax = conf.high)
+) +
+  geom_ribbon(alpha = 0.25, fill = "#2C7FB8") +
+  geom_line(color = "#2C7FB8", linewidth = 0.4) +
+  geom_hline(yintercept = 0, linetype = "dotted", color = "grey30") +
+  coord_cartesian(ylim = c(-cs_cap, cs_cap)) +
+  facet_wrap(~label, ncol = 3) +
+  labs(
+    x = "Respondents observed (G)",
+    y = "AMCE estimate, with 95% confidence sequence"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(panel.grid.minor = element_blank(), strip.text = element_text(face = "bold"))
+```
+
+Figure \ref{fig:fig-cs} shows every attribute's confidence sequence
+narrowing steadily as more respondents are observed, while remaining valid to
+inspect at any point along the way -- there is no multiple-looks penalty for
+having watched, say, the experience effect firm up over the first few
+hundred respondents before checking in on the candidate-gender effect. The
+one exception is `r as.character(never_cross$label)`,
+whose confidence sequence still includes zero at the full sample size
+($`r sprintf("%.3f", age65_final$conf.low)`$ to
+$`r sprintf("%.3f", age65_final$conf.high)`$); every other attribute's
+confidence sequence excludes zero by $G = `r format(meta$G_total, big.mark = ",")`$.
+
+## e-values over time
+
+```{r fig-evalues, fig.width=7.5, fig.height=7.7, fig.cap="Anytime-valid e-value for each AMCE as respondents accumulate (log scale). The dashed red line is $1/\\alpha$, the threshold an e-value must cross to reject the null of no effect at level $\\alpha$; the dotted grey line is $e=1$ (neutral evidence)."}
+ggplot(sequential_estimates, aes(x = G, y = e_value)) +
+  geom_line(color = "#D95F02", linewidth = 0.4) +
+  geom_hline(yintercept = 1 / meta$alpha, linetype = "dashed", color = "red") +
+  geom_hline(yintercept = 1, linetype = "dotted", color = "grey40") +
+  scale_y_log10() +
+  facet_wrap(~label, ncol = 3, scales = "free_y") +
+  labs(
+    x = "Respondents observed (G)",
+    y = "Anytime-valid e-value (log scale)"
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(panel.grid.minor = element_blank(), strip.text = element_text(face = "bold"))
+```
+
+Figure \ref{fig:fig-evalues} shows the corresponding e-value trajectories.
+`r n_cross` of the `r n_terms` attributes cross the $1/\alpha$ rejection
+threshold by the end of the sample; the exception is
+`r as.character(never_cross$label)`, whose e-value never separates from
+neutral evidence (it is $`r sprintf("%.2f", age65_final$e_value)`$ at the
+final sample size), consistent with its confidence sequence including zero
+throughout (Figure \ref{fig:fig-cs}). Among the `r n_cross` attributes that
+do cross, the number of respondents needed to first do so varies
+substantially: from $G = `r format(fastest_cross$first_G, big.mark = ",")`$
+for `r as.character(fastest_cross$label)` to
+$G = `r format(slowest_cross$first_G, big.mark = ",")`$ for
+`r as.character(slowest_cross$label)`. Candidate gender -- the attribute of
+central interest here -- first crosses at
+$G = `r format(female_first_G, big.mark = ",")`$, i.e. roughly
+`r sprintf("%.0f", female_pct_of_sample)`\% of the way through the sample,
+making it the `r female_cross_rank`th of `r n_cross` crossing attributes to
+resolve. The trajectories are not always monotonic once above the
+threshold: `r n_dip` of the `r n_cross` crossing attributes, including
+candidate gender, dip back below it at least once after their first
+crossing. This is expected of e-processes and is harmless under the relevant
+decision rule, which is to stop and reject the very first time the threshold
+is crossed, rather than requiring it to stay crossed forever.
+
+## Fixed-$n$ interval vs. confidence sequence, at the final sample size
+
+```{r fig-final, fig.width=6.5, fig.height=5.8, fig.cap=sprintf("Final AMCE point estimate with a conventional fixed-$n$ 95\\%% confidence interval versus the anytime-valid 95\\%% confidence sequence, both computed from the same final model fit ($G = %s$).", format(meta$G_total, big.mark = ","))}
+ggplot(
+  final_comparison,
+  aes(x = label, y = estimate, ymin = conf.low, ymax = conf.high, color = method)
+) +
+  geom_hline(yintercept = 0, linetype = "dotted", color = "grey40") +
+  geom_pointrange(position = position_dodge(width = 0.5), size = 0.4) +
+  coord_flip() +
+  scale_color_manual(values = c(
+    "Conventional (fixed-n)" = "grey40",
+    "Anytime-valid (CS)"     = "#2C7FB8"
+  )) +
+  labs(x = NULL, y = "AMCE estimate (95% interval)", color = NULL) +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom", panel.grid.minor = element_blank())
+```
+
+Figure \ref{fig:fig-final} makes explicit the price of anytime validity at a
+single, fixed sample size: the two methods share the same point estimate
+(they are computed from the same model fit), but the confidence sequence is
+visibly wider than the conventional interval for every AMCE. That extra
+width is exactly what buys the ability to monitor the study continuously, as
+in Figures \ref{fig:fig-cs} and \ref{fig:fig-evalues}, and still report a
+valid interval or rejection decision at whatever point the analyst chooses
+to stop -- something the conventional interval does not license. For
+candidate gender specifically, both intervals exclude zero at the final
+sample size, and both are centered on the same estimate,
+$`r sprintf("%.3f", female_est)`$: female candidates are, if anything,
+slightly more likely to win a pairwise comparison than otherwise-identical
+male candidates in this sample.
+
+# Discussion
+
+On this real conjoint dataset, `r n_cross` of the 13 attributes -- years of
+experience, spousal status, occupation, number of children, age 45 (but not
+age 65), and candidate gender -- have a confidence sequence that excludes
+zero and an e-value that comfortably clears the rejection threshold by the
+end of data collection. As in the companion case study, the anytime-valid
+approach trades away some precision at any single fixed sample size for the
+ability to monitor these effects continuously and still report a valid
+interval or rejection decision at whichever point an analyst actually
+chooses to stop, rather than only at one pre-registered $n$.
+
+**Candidate gender.** The coefficient on `orig_cand_female` is the attribute
+of central substantive interest for this case study, since the motivating
+question behind the underlying experiment is whether candidate gender
+affects voter support. Its anytime-valid point estimate is
+$+`r sprintf("%.3f", female_est)`$: holding experience, spousal status,
+occupation, number of children, and age fixed, a female candidate is
+estimated to be about `r sprintf("%.1f", 100 * female_est)` percentage
+points *more* likely to win a pairwise comparison against an
+otherwise-identical male candidate among 2014 general-population voters, and
+this effect is anytime-valid significant
+($e = `r fmt_e(female_final_e)`$ at the final
+sample size). This is consistent with the original study's headline finding
+of no outright hostility toward female candidates among the general
+public -- if anything a modest advantage here -- rather than evidence of
+straightforward voter bias against women. At the same time, the
+candidate-gender effect is both comparatively small in magnitude (about
+`r sprintf("%.0f", 100 * female_est / abs(largest_effect$estimate))`\% of
+the size of the largest AMCE in this study,
+`r as.character(largest_effect$label)`, at
+$`r sprintf("%.3f", largest_effect$estimate)`$) and comparatively slow to
+resolve under continuous monitoring (the
+`r female_cross_rank`th of `r n_cross` attributes to cross the e-value
+threshold, at `r sprintf("%.0f", female_pct_of_sample)`\% of the way through
+the sample). A study designed and powered only around the large, fast-
+resolving experience or occupation effects could easily be underpowered to
+say anything conclusive about the smaller, slower gender effect at the same
+fixed sample size -- exactly the scenario anytime-valid monitoring is
+designed for, since it lets data collection continue, with a running valid
+answer at every point, until whichever effect the analyst cares about has
+actually resolved.
+
+Two further caveats are worth flagging as natural extensions. First, this
+case study fits a single additive AMCE model and so cannot speak to the
+original study's central "double bind" finding -- that traditionally
+gendered traits such as marital status, children, and occupation are
+rewarded or penalized *differently* depending on candidate gender. Testing
+that would require anytime-valid inference on interaction terms (e.g.
+`orig_cand_female` $\times$ occupation), which the e-value and
+confidence-sequence construction used here extends to directly but which we
+leave to future work. Second, this case study deliberately restricts to the
+2014 general-population voter sample under the original attribute set; the
+2018 study also fielded a parallel sample of political elites/legislators
+and a 2017 legislator-only replication with a modified attribute set, both
+of which would make natural additional anytime-valid case studies,
+potentially with different conclusions given that political elites and the
+mass public need not react to candidate gender the same way.
+
+# References
+
+- Teele, D. L., Kalla, J., and Rosenbluth, F. (2018). The Ties That Double
+  Bind: Social Roles and Women's Underrepresentation in Politics. *American
+  Political Science Review*, 112(3), 525-541.
+- Teele, D. L., Kalla, J., and Rosenbluth, F. (2018). Replication Data for:
+  The Ties That Double Bind: Social Roles and Women's Underrepresentation in
+  Politics. *Harvard Dataverse*. doi:10.7910/DVN/FVCGHC.
+- Lindon, M., Ham, D., Tingley, M., and Bojinov, I. (2026). Anytime-valid
+  linear models and regression adjusted causal inference in randomized
+  experiments. *Journal of the American Statistical Association*.
+  arXiv:2210.08589.
+- Molitor, D., Gosciak, J., and Lindon, M. (2026). Anytime-Valid Inference in
+  Conjoint Experiments.
