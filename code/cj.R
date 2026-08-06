@@ -40,6 +40,65 @@ p_G_t <- function(log_G_t_values) {
   pmin(1.0, exp(-log_G_t_values))
 }
 
+f_radius <- function(g, G, d, alpha) {
+  nu <- G - d
+  if (nu <= 0) stop("G must be greater than d.")
+  T <- g / (g + G)
+  powered_term <- (T * alpha^(2 / d))^(d / (nu + d))
+  numerator <- (nu / d) * (1 - powered_term)
+  denominator <- max(0, powered_term - T)
+  numerator / denominator
+}
+
+log_G_multivariate_t <- function(Q, G, g, d) {
+  nu <- G - d
+  if (nu <= 0) stop("G must be greater than d.")
+  r <- g / (g + G)
+  (d / 2) * log(r) +
+    (0.5 * (nu + d)) * (log(1 + Q / nu) - log(1 + r * Q / nu))
+}
+
+optimal_g_multivariate <- function(G, d, alpha) {
+  if (G <= d) stop("G must be greater than d.")
+  if (alpha < 0 || alpha > 1) stop("alpha must be in (0,1).")
+
+  nu <- G - d
+  upper_bound <- G * alpha^(2 / nu) / (1 - alpha^(2 / nu))
+  lower_bound <- 1
+
+  opt_result <- optimize(
+    f_radius,
+    interval = c(lower_bound, upper_bound),
+    G = G,
+    d = d,
+    alpha = alpha
+  )
+  opt_result$minimum
+}
+
+wald_tidy <- function(model, terms, alpha, cluster, g = NULL) {
+  beta <- coef(model)[terms]
+  V <- vcov(model)[terms, terms, drop = FALSE]
+  G <- nlevels(as.factor(cluster))
+  d <- length(terms)
+  if (is.null(g)) g <- optimal_g_multivariate(G, d, alpha)
+
+  Q <- as.numeric(crossprod(beta, solve(V, beta)))
+  F_stat <- Q / d
+  fixed_p <- stats::pf(F_stat, df1 = d, df2 = G - d, lower.tail = FALSE)
+  av_p <- p_G_t(log_G_multivariate_t(Q, G, g, d))
+
+  tibble::tibble(
+    term = paste(terms, collapse = ", "),
+    statistic = F_stat,
+    wald = Q,
+    df1 = d,
+    df2 = G - d,
+    p.value = av_p,
+    p.value.fixed = fixed_p
+  )
+}
+
 # Value of g that minimizes the confidence-sequence radius (t_radius) for a
 # given number of clusters G.
 optimal_g <- function(G, alpha) {
@@ -86,21 +145,228 @@ av_tidy <- function(model, alpha, cluster, g = NULL) {
   )
 }
 
+level_values <- function(x) {
+  if (is.numeric(x)) names(x) else as.character(x)
+}
+
+level_probabilities <- function(x) {
+  if (is.numeric(x)) {
+    probs <- as.numeric(x)
+    names(probs) <- names(x)
+    probs / sum(probs)
+  } else {
+    levs <- as.character(x)
+    probs <- rep(1 / length(levs), length(levs))
+    names(probs) <- levs
+    probs
+  }
+}
+
+profile_grid <- function(levels) {
+  attrs <- names(levels)
+  levs <- lapply(levels, level_values)
+  probs <- lapply(levels, level_probabilities)
+
+  grid <- expand.grid(levs, stringsAsFactors = FALSE)
+  names(grid) <- attrs
+  grid <- as_tibble(grid)
+  grid$.prob <- Reduce(
+    `*`,
+    Map(function(a) probs[[a]][grid[[a]]], attrs)
+  )
+  grid
+}
+
+respondent_type_distribution <- function(respondent_types) {
+  if (is.null(respondent_types)) {
+    respondent_types <- c("-0.45" = 0.25, "0" = 0.50, "0.45" = 0.25)
+  }
+  if (is.null(names(respondent_types))) {
+    probs <- rep(1 / length(respondent_types), length(respondent_types))
+    values <- as.numeric(respondent_types)
+  } else {
+    probs <- as.numeric(respondent_types)
+    values <- as.numeric(names(respondent_types))
+  }
+  probs <- probs / sum(probs)
+  list(values = values, probs = probs)
+}
+
+profile_score <- function(prof_df, amces, interactions = NULL) {
+  attrs <- names(prof_df)
+  score <- numeric(nrow(prof_df))
+
+  for (a in attrs) {
+    v <- amces[[a]]
+    if (!is.null(v) && length(v)) {
+      add <- unname(v[prof_df[[a]]])
+      add[is.na(add)] <- 0
+      score <- score + add
+    }
+  }
+
+  if (!is.null(interactions) && length(attrs) >= 2) {
+    attr1 <- attrs[[1]]
+    attr2 <- attrs[[2]]
+    rows <- prof_df[[attr1]]
+    cols <- prof_df[[attr2]]
+    ok <- rows %in% rownames(interactions) & cols %in% colnames(interactions)
+    if (any(ok)) {
+      score[ok] <- score[ok] + interactions[cbind(rows[ok], cols[ok])]
+    }
+  }
+
+  score
+}
+
+profile_utility <- function(prof_df, levels, amces, interactions = NULL, respondent_taste = 0) {
+  attrs <- names(levels)
+  prof_attrs <- prof_df[, attrs, drop = FALSE]
+  base <- profile_score(prof_attrs, amces, interactions)
+
+  party_nonbaseline <- rep(0, nrow(prof_attrs))
+  if ("Party" %in% attrs) {
+    party_base <- level_values(levels[["Party"]])[[1]]
+    party_nonbaseline <- as.numeric(prof_attrs$Party != party_base)
+  }
+
+  region_scaled <- rep(0, nrow(prof_attrs))
+  if ("Region" %in% attrs) {
+    region_levels <- level_values(levels[["Region"]])
+    denom <- max(1, length(region_levels) - 1)
+    region_scaled <- (match(prof_attrs$Region, region_levels) - 1) / denom
+    region_scaled <- region_scaled - mean(seq(0, 1, length.out = length(region_levels)))
+  }
+
+  base +
+    0.35 * base^2 -
+    0.10 * base^3 +
+    0.12 * base * party_nonbaseline +
+    respondent_taste * party_nonbaseline +
+    0.08 * respondent_taste * region_scaled
+}
+
+compute_linear_amces <- function(levels, amces, interactions = NULL) {
+  if (is.null(interactions)) {
+    out <- lapply(
+      names(levels),
+      function(x) {
+        levs <- level_values(levels[[x]])[-1]
+        vals <- unname(amces[[x]][levs])
+        vals[is.na(vals)] <- 0
+        stats::setNames(vals, levs)
+      }
+    )
+    names(out) <- names(levels)
+    return(out)
+  }
+
+  out <- lapply(
+    names(levels),
+    function(x) {
+      baseline <- level_values(levels[[x]])[[1]]
+      vapply(
+        level_values(levels[[x]])[-1],
+        function(y) {
+          conditioning_var <- names(levels)[!names(levels) == x]
+          conditioning_levels <- level_values(levels[[conditioning_var]])
+          conditioning_probs <- level_probabilities(levels[[conditioning_var]])
+
+          sum(vapply(
+            conditioning_levels,
+            function(conditioning_level) {
+              if (conditioning_level %in% colnames(interactions)) {
+                (
+                  (amces[[x]][[y]] + interactions[y, conditioning_level]) -
+                    (0 + interactions[baseline, conditioning_level])
+                ) * conditioning_probs[[conditioning_level]]
+              } else {
+                (
+                  (amces[[x]][[y]] + interactions[conditioning_level, y]) -
+                    (0 + interactions[conditioning_level, baseline])
+                ) * conditioning_probs[[conditioning_level]]
+              }
+            },
+            numeric(1)
+          ))
+        },
+        numeric(1)
+      )
+    }
+  )
+  names(out) <- names(levels)
+  out
+}
+
+compute_logit_amces <- function(levels, amces, interactions = NULL, respondent_types = NULL) {
+  grid <- profile_grid(levels)
+  attrs <- names(levels)
+  types <- respondent_type_distribution(respondent_types)
+
+  p_chosen <- numeric(nrow(grid))
+  for (k in seq_along(types$values)) {
+    own_eta <- profile_utility(grid, levels, amces, interactions, types$values[[k]])
+    opp_eta <- own_eta
+    p_given_type <- vapply(
+      own_eta,
+      function(eta) sum(grid$.prob * plogis(eta - opp_eta)),
+      numeric(1)
+    )
+    p_chosen <- p_chosen + types$probs[[k]] * p_given_type
+  }
+
+  out <- lapply(
+    attrs,
+    function(a) {
+      levs <- level_values(levels[[a]])
+      baseline <- levs[[1]]
+      base_prob <- sum(grid$.prob[grid[[a]] == baseline])
+      base_mean <- sum(grid$.prob[grid[[a]] == baseline] * p_chosen[grid[[a]] == baseline]) / base_prob
+      vapply(
+        levs[-1],
+        function(lvl) {
+          lvl_prob <- sum(grid$.prob[grid[[a]] == lvl])
+          lvl_mean <- sum(grid$.prob[grid[[a]] == lvl] * p_chosen[grid[[a]] == lvl]) / lvl_prob
+          lvl_mean - base_mean
+        },
+        numeric(1)
+      )
+    }
+  )
+  names(out) <- attrs
+  out
+}
+
 # This class implements a simple conjoint object. Primarily used for the empirical simulations
 ConjointSim <- R6Class(
   "ConjointSim",
   public = list(
     levels = NULL, # list: attr -> (vector of levels OR named prob vector)
-    amces = NULL, # list: attr -> named numeric (non-baseline levels; baseline=0)
-    interactions = NULL, # matrix: rownames = levels(attr1), colnames = levels(attr2)
+    amces = NULL, # utility coefficients for non-baseline levels; baseline=0
+    interactions = NULL, # utility interactions: rownames = levels(attr1), colnames = levels(attr2)
+    dgp = NULL,
+    respondent_types = NULL,
+    next_resp_id = NULL,
+    next_pair_id = NULL,
     n_tasks = NULL,
     estimates = NULL,
 
-    initialize = function(levels, amces, interactions = NULL, n_tasks = 5) {
+    initialize = function(
+      levels,
+      amces,
+      interactions = NULL,
+      n_tasks = 5,
+      dgp = "linear",
+      respondent_types = c("-0.45" = 0.25, "0" = 0.50, "0.45" = 0.25)
+    ) {
       self$levels <- levels
       self$amces <- amces
       self$interactions <- interactions
+      self$dgp <- match.arg(dgp, c("logit", "linear"))
+      self$respondent_types <- respondent_types
       self$n_tasks <- as.integer(n_tasks)
+      self$next_resp_id <- 1L
+      self$next_pair_id <- 1L
     },
 
     plot_estimates = function(uniform_only = FALSE, show_when_stat_sig = TRUE) {
@@ -116,15 +382,14 @@ ConjointSim <- R6Class(
       } else {
         estimates <- self$estimates
       }
+      truth_lines <- estimates |>
+        distinct(attribute, level, amce)
       p <- ggplot(
           estimates,
           aes(x = i, y = estimate, ymin = conf.low, ymax = conf.high)
         ) +
         geom_line() +
         geom_ribbon(alpha = 0.2)
-      if (!uniform_only) {
-        p <- p + geom_hline(aes(yintercept = amce), color = "red", linetype = "dashed")
-      }
       if (show_when_stat_sig) {
         p <- p + geom_vline(
           aes(xintercept = first_stat_sig),
@@ -134,14 +399,7 @@ ConjointSim <- R6Class(
       }
       p <- p + geom_hline(
         aes(yintercept = amce),
-        data = tibble(amces = self$amces) |>
-          unnest_longer("amces", values_to = "amce", indices_to = "level") |>
-          mutate(
-            "attribute" = c(
-              rep("Party", length(self$amces[["Party"]])),
-              rep("Region", length(self$amces[["Region"]]))
-            )
-          ),
+        data = truth_lines,
         color = "red",
         linetype = "dashed"
       ) +
@@ -162,7 +420,7 @@ ConjointSim <- R6Class(
         geom_line() +
         facet_wrap(~ name, scales = "free_y", ncol = 1) +
         theme_minimal() +
-        labs(x = "Sample size", y = "Assignment probability", color = "")
+        labs(x = "Respondent clusters (G)", y = "Assignment probability", color = "")
     },
 
     probabilities = tibble::tibble(),
@@ -204,57 +462,40 @@ ConjointSim <- R6Class(
 
       n_pairs <- n_respondents * self$n_tasks
       n_rows  <- 2 * n_pairs
+      resp_ids <- seq.int(self$next_resp_id, length.out = n_respondents)
+      pair_ids <- seq.int(self$next_pair_id, length.out = n_pairs)
+      self$next_resp_id <- self$next_resp_id + n_respondents
+      self$next_pair_id <- self$next_pair_id + n_pairs
 
       # vectorized profile draws
       draw_attr <- function(a) sample(levs[[a]], n_rows, TRUE, probs[[a]])
       prof_df <- as_tibble(setNames(lapply(attrs, draw_attr), attrs))
 
-      # m(x): sum of amces for present non-baseline levels
-      m <- numeric(n_rows)
-      for (a in attrs) {
-        v <- self$amces[[a]]
-        if (!is.null(v) && length(v)) {
-          add <- v[ prof_df[[a]] ]
-          add[is.na(add)] <- 0
-          m <- m + add
+      if (self$dgp == "linear") {
+        m <- profile_score(prof_df, self$amces, self$interactions)
+        alpha <- rep(runif(n_respondents, 0, 0.25), each = 2 * self$n_tasks)
+        m <- m + alpha
+
+        if (any(m < -0.1 | m > 0.4)) {
+          stop("Score function m(x) has too large of values; shrink amces or interactions.")
         }
+        q <- 0.2 + 2 * m
+
+        y <- rbinom(n_rows, 1, q)
+        Y <- matrix(y, ncol = 2, byrow = TRUE)
+        ties <- (Y[,1] == Y[,2])
+        win <- integer(n_pairs)
+        win[!ties] <- ifelse(Y[!ties, 1] > Y[!ties, 2], 1, 2)
+        win[ties]  <- sample.int(2, sum(ties), TRUE)
+      } else {
+        types <- respondent_type_distribution(self$respondent_types)
+        respondent_taste <- sample(types$values, n_respondents, TRUE, types$probs)
+        taste <- rep(rep(respondent_taste, each = self$n_tasks), each = 2)
+        eta <- profile_utility(prof_df, self$levels, self$amces, self$interactions, taste)
+        eta_pair <- matrix(eta, ncol = 2, byrow = TRUE)
+        p_first <- plogis(eta_pair[, 1] - eta_pair[, 2])
+        win <- ifelse(runif(n_pairs) < p_first, 1L, 2L)
       }
-
-      # add interaction contribution if provided
-      if (!is.null(self$interactions)) {
-        attr1 <- attrs[1]
-        attr2 <- attrs[2]
-        IA <- self$interactions
-        interaction_effects <- mapply(
-          function(a, b) {
-            if (!a %in% rownames(IA) || !b %in% colnames(IA)) return(0)
-            IA[a, b]
-          },
-          prof_df[[attr1]],
-          prof_df[[attr2]]
-        )
-        m <- m + interaction_effects
-      }
-
-      # respondent and profile noises (affect variance, not expected AMCEs)
-      # alpha <- rep(rnorm(n_respondents, 0, 0.005), each = 2 * self$n_tasks)
-      alpha <- rep(runif(n_respondents, 0, 0.25), each = 2 * self$n_tasks)
-      m <- m + alpha
-
-      if (any(m < -0.1 | m > 0.4)) {
-        stop("Score function m(x) has too large of values; shrink amces or interactions.")
-      }
-      # Thought process here, what is the purpose of the 2*m scaling factor?
-      # Should be C + m where C is the largest possible negative score m.
-      q <- 0.2 + 2 * m
-
-      # Bernoulli per row; tie-break within pair
-      y <- rbinom(n_rows, 1, q)
-      Y <- matrix(y, ncol = 2, byrow = TRUE)
-      ties <- (Y[,1] == Y[,2])
-      win <- integer(n_pairs)
-      win[!ties] <- ifelse(Y[!ties, 1] > Y[!ties, 2], 1, 2)
-      win[ties]  <- sample.int(2, sum(ties), TRUE)
 
       chosen <- integer(n_rows)
       chosen[(2 * seq_len(n_pairs) - 2) + win] <- 1
@@ -262,8 +503,8 @@ ConjointSim <- R6Class(
       out <- bind_cols(
         prof_df,
         chosen  = chosen,
-        pair_id = rep(seq_len(n_pairs), each = 2),
-        resp_id = rep(rep(seq_len(n_respondents), each = self$n_tasks), each = 2),
+        pair_id = rep(pair_ids, each = 2),
+        resp_id = rep(rep(resp_ids, each = self$n_tasks), each = 2),
         alt_id  = rep.int(1:2, times = n_pairs)
       )
 
@@ -279,8 +520,8 @@ ConjointSim <- R6Class(
       for (i in seq(0, experiment_size, by = chunk_size)[-1]) {
         cj_data <- bind_rows(cj_data, self$sample(n_respondents = chunk_size)) |>
           mutate(
-            Party = factor(Party, levels = names(self$levels[["Party"]])),
-            Region = factor(Region, levels = names(self$levels[["Region"]]))
+            Party = factor(Party, levels = level_values(self$levels[["Party"]])),
+            Region = factor(Region, levels = level_values(self$levels[["Region"]]))
           )
         # Estimate AMCEs with cluster-robust SEs
         if (is.null(weight_fn)) {
@@ -312,9 +553,18 @@ ConjointSim <- R6Class(
         )
       }
 
-      truth <- tibble(amces = compute_true_amces(self$levels, self$amces, self$interactions)) |>
+      truth <- tibble(amces = compute_true_amces(
+        self$levels,
+        self$amces,
+        self$interactions,
+        dgp = self$dgp,
+        respondent_types = self$respondent_types
+      )) |>
         unnest_longer("amces", values_to = "amce", indices_to = "level") |>
-        mutate("attribute" = c(rep("Party", length(self$levels[["Party"]])-1), rep("Region", length(self$levels[["Region"]])-1)))
+        mutate("attribute" = c(
+          rep("Party", length(level_values(self$levels[["Party"]])) - 1),
+          rep("Region", length(level_values(self$levels[["Region"]])) - 1)
+        ))
       cj_estimates <- cj_estimates |>
         separate("term", into = c("attribute", "level"), sep = "(?<=[a-z])(?=[A-Z])") |>
         left_join(truth, by = c("attribute", "level"))
@@ -327,8 +577,8 @@ ConjointSim <- R6Class(
       # Sample data
       cj_data <- self$sample(n_respondents = experiment_size) |>
         mutate(
-          Party = factor(Party, levels = names(self$levels[["Party"]])),
-          Region = factor(Region, levels = names(self$levels[["Region"]]))
+          Party = factor(Party, levels = level_values(self$levels[["Party"]])),
+          Region = factor(Region, levels = level_values(self$levels[["Region"]]))
         )
       # Fit model
       if (is.null(weight_fn)) {
@@ -345,9 +595,18 @@ ConjointSim <- R6Class(
       cj_tidy <- broom::tidy(cj_model, conf.int = TRUE) |> filter(term != "(Intercept)")
       self$probabilities <- tidyr::unnest_longer(tibble::enframe(self$levels), col = "value")
       # Append the true estimand values
-      truth <- tibble(amces = compute_true_amces(self$levels, self$amces, self$interactions)) |>
+      truth <- tibble(amces = compute_true_amces(
+        self$levels,
+        self$amces,
+        self$interactions,
+        dgp = self$dgp,
+        respondent_types = self$respondent_types
+      )) |>
         unnest_longer("amces", values_to = "amce", indices_to = "level") |>
-        mutate("attribute" = c(rep("Party", length(self$levels[["Party"]])-1), rep("Region", length(self$levels[["Region"]])-1)))
+        mutate("attribute" = c(
+          rep("Party", length(level_values(self$levels[["Party"]])) - 1),
+          rep("Region", length(level_values(self$levels[["Region"]])) - 1)
+        ))
       cj_tidy <- cj_tidy |>
         separate("term", into = c("attribute", "level"), sep = "(?<=[a-z])(?=[A-Z])") |>
         left_join(truth, by = c("attribute", "level"))
@@ -426,47 +685,20 @@ ConjointSim <- R6Class(
   )
 )
 
-# This function is used to calculate true AMCE values
-compute_true_amces <- function(levels, amces, interactions = NULL) {
-  amces <- lapply(
-    names(levels),
-    function(x) {
-      baseline <- names(levels[[x]])[[1]]
-      vapply(
-        names(levels[[x]][-1]),
-        function(y) {
-          conditioning_var <- names(levels)[!names(levels) == x]
-
-          # Calculates E_{Conditioning Attribute}(E[Level - Baseline | Condit. Attr.])
-
-          sum(vapply(
-            names(levels[[conditioning_var]]),
-            function(conditioning_level) {
-
-              # Calculates E[Level - Baseline | Conditioning Attribute] * Pr(Cond. Attr)
-
-              if (conditioning_level %in% colnames(interactions)) {
-                pr = (
-                  (amces[[x]][[y]] + interactions[y, conditioning_level]) -
-                  (0 + interactions[baseline, conditioning_level])
-                ) * levels[[conditioning_var]][[conditioning_level]]
-              } else {
-                pr = (
-                  (amces[[x]][[y]] + interactions[conditioning_level, y]) -
-                  (0 + interactions[conditioning_level, baseline])
-                ) * levels[[conditioning_var]][[conditioning_level]]
-              }
-              return(pr)
-            },
-            numeric(1)
-          ))
-        },
-        numeric(1)
-      )
-    }
-  )
-  names(amces) <- names(levels)
-  return(amces)
+# This function is used to calculate exact design-based AMCE values.
+compute_true_amces <- function(
+  levels,
+  amces,
+  interactions = NULL,
+  dgp = "logit",
+  respondent_types = c("-0.45" = 0.25, "0" = 0.50, "0.45" = 0.25)
+) {
+  dgp <- match.arg(dgp, c("logit", "linear"))
+  if (dgp == "linear") {
+    compute_linear_amces(levels, amces, interactions)
+  } else {
+    compute_logit_amces(levels, amces, interactions, respondent_types)
+  }
 }
 
 # A simple function to retry an expression if it fails
