@@ -80,4 +80,4 @@ coverage_sim <- bind_rows(
 plan(sequential)
 
 # Save results locally
-write_csv(coverage_sim, here("data", "figure5.csv"))
+write_csv(coverage_sim, here("data", "figure9.csv"))

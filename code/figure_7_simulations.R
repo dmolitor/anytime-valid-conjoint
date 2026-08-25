@@ -2,14 +2,12 @@ suppressPackageStartupMessages({
   library(dplyr)
   library(future)
   library(future.apply)
-  library(ggplot2)
   library(here)
   library(readr)
   library(tidyr)
 })
 
 source(here("code", "cj.R"))
-source(here("code", "figure_style.R"))
 
 options(future.globals.maxSize = Inf)
 
@@ -219,30 +217,4 @@ results <- bind_rows(sims) |>
     n_sim = n_sim
   )
 
-final_summary <- results |>
-  filter(G == max(G)) |>
-  arrange(Test, Method)
-
-write_csv(results, here("data", "figure2_long_horizon.csv"))
-write_csv(final_summary, here("data", "figure2_long_horizon_final.csv"))
-
-p <- ggplot(results, aes(x = G, y = p_false_positive, color = Method, fill = Method)) +
-  geom_ribbon(aes(ymin = ci_low, ymax = ci_high), alpha = 0.12, color = NA) +
-  geom_line(linewidth = 0.6) +
-  geom_hline(yintercept = alpha, linetype = "dashed", color = paper_colors$reference) +
-  scale_x_log10(labels = scales::label_comma()) +
-  scale_y_continuous(labels = scales::label_percent(accuracy = 1), limits = c(0, NA)) +
-  scale_color_manual(values = method_palette) +
-  scale_fill_manual(values = method_palette) +
-  facet_wrap(~ Test) +
-  labs(
-    x = "Respondent clusters (G, log scale)",
-    y = "Cumulative Type I error",
-    color = NULL,
-    fill = NULL
-  ) +
-  conjoint_theme()
-
-save_paper_figure("figure2_long_horizon.png", p, width = 8, height = 4.8)
-
-print(final_summary, n = Inf)
+write_csv(results, here("data", "figure7.csv"))

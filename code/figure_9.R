@@ -11,7 +11,7 @@ source(here("code", "figure_style.R"))
 n_sim <- 1000
 significance_level <- 0.05
 
-coverage_sim <- read_csv(here("data", "figure5.csv"), show_col_types = FALSE)
+coverage_sim <- read_csv(here("data", "figure9.csv"), show_col_types = FALSE)
 
 # Calculate error rates
 error_rates <- coverage_sim |>
@@ -58,7 +58,7 @@ suppressWarnings({
 
   # Save plot
   save_paper_figure(
-    "figure5.png",
+    "figure9.png",
     plot = error_rates_plot,
     width = 5,
     height = 2.6

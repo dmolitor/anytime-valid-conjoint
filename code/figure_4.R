@@ -35,9 +35,9 @@ suppressWarnings({
     scale_x_continuous(breaks = seq(1, 3, by = 0.25)) +
     labs(
       x = "True AMCE \u00F7 Powered-for AMCE",
-      y = "Mean clusters saved"
+      y = "Mean sample saved"
     ) +
-    conjoint_theme() +
+    conjoint_theme(base_size = 11) +
     theme(
       legend.position = "none"
     )

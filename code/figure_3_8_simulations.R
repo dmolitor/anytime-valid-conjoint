@@ -84,7 +84,7 @@ sim_efficiency <- lapply(
 )
 sim_efficiency_df <- bind_rows(lapply(sim_efficiency, bind_rows))
 suppressMessages({
-  write_fst(sim_efficiency_df, here("data", "figure_3_6_av.fst"))
+  write_fst(sim_efficiency_df, here("data", "figure_3_8_av.fst"))
 })
 
 ## Run fixed-sample efficiency simulations ------------------------------------
@@ -140,7 +140,7 @@ sim_efficiency_fixed <- lapply(
 
 sim_efficiency_fixed_df <- bind_rows(lapply(sim_efficiency_fixed, bind_rows))
 suppressMessages({
-  write_fst(sim_efficiency_fixed_df, here("data", "figure_3_6_fixed.fst"))
+  write_fst(sim_efficiency_fixed_df, here("data", "figure_3_8_fixed.fst"))
 })
 
 ## Calculate the sample-efficiency of both methods ----------------------------
@@ -183,5 +183,5 @@ sample_efficiency_df <- sim_efficiency_df |>
   )
 
 suppressMessages({
-  write_fst(sample_efficiency_df, here("data", "figure_3_6_efficiency.fst"))
+  write_fst(sample_efficiency_df, here("data", "figure_3_8_efficiency.fst"))
 })

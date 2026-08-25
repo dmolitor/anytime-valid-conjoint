@@ -12,7 +12,7 @@ suppressPackageStartupMessages({
 source(here("code", "figure_style.R"))
 
 sample_efficiency_df <- suppressMessages({
-  read_fst(here("data", "figure_3_6_efficiency.fst"))
+  read_fst(here("data", "figure_3_8_efficiency.fst"))
 }) |>
   as_tibble() |>
   mutate(
@@ -25,7 +25,7 @@ sample_efficiency_df <- suppressMessages({
 
 cluster_cap_colors <- cluster_cap_palette(levels(sample_efficiency_df$G_max))
 
-## Appendix Figure 3 ----------------------------------------------------------
+## Appendix Figure 8 ----------------------------------------------------------
 
 suppressWarnings({
 
@@ -63,10 +63,10 @@ suppressWarnings({
     scale_y_continuous(labels = percent, limits = c(0, 1)) +
     labs(
       x = "AMCE",
-      y = "Mean clusters saved (%)",
+      y = "Mean sample saved (%)",
       color = ""
     ) +
-    conjoint_theme() +
+    conjoint_theme(base_size = 11) +
     scale_color_manual(values = cluster_cap_colors) +
     theme(plot.title = element_text(hjust = 0.5, face = "bold"))
 
@@ -105,7 +105,7 @@ suppressWarnings({
       x = "AMCE",
       y = "Pr(early stopping)"
     ) +
-    conjoint_theme() +
+    conjoint_theme(base_size = 11) +
     scale_color_manual(values = cluster_cap_colors) +
     guides(color = "none") +
     theme(
@@ -118,7 +118,7 @@ suppressWarnings({
     theme(legend.position = "bottom")
 
   ggsave(
-    here("figures", "figure6.png"),
+    here("figures", "figure8.png"),
     plot = sample_efficiency_plot,
     dpi = 500,
     width = 8,
@@ -152,8 +152,8 @@ annot_label_early <- glue(
 
 annot_label_save <- glue(
   "Gmax = {comma(annot_n)}, AMCE = {number(annot_df$amce[[1]], accuracy = 0.01)}\n",
-  "Mean saved = {percent(annot_p_save, accuracy = 1)}\n",
-  "(about {comma(annot_n_save)} clusters)"
+  "Mean sample saved = {percent(annot_p_save, accuracy = 1)}\n",
+  "(about {comma(annot_n_save)} respondents)"
 )
 
 suppressWarnings({
@@ -209,10 +209,10 @@ suppressWarnings({
     scale_y_continuous(labels = percent, limits = c(0, 1)) +
     labs(
       x = "AMCE",
-      y = "Mean clusters saved (%)",
+      y = "Mean sample saved (%)",
       color = ""
     ) +
-    conjoint_theme() +
+    conjoint_theme(base_size = 11) +
     scale_color_manual(values = cluster_cap_colors) +
     theme(plot.title = element_text(hjust = 0.5, face = "bold"))
 
@@ -269,7 +269,7 @@ suppressWarnings({
       x = "AMCE",
       y = "Pr(early stopping)"
     ) +
-    conjoint_theme() +
+    conjoint_theme(base_size = 11) +
     scale_color_manual(values = cluster_cap_colors) +
     guides(color = "none") +
     theme(
@@ -293,8 +293,8 @@ suppressWarnings({
 ## This data compares power curves between anytime-valid and fixed-n methods
 ## Not currently included in the paper.
 
-# sim_efficiency_df <- read_fst(here("data", "figure_3_6_av.fst"))
-# sim_efficiency_fixed_df <- read_fst(here("data", "figure_3_6_fixed.fst"))
+# sim_efficiency_df <- read_fst(here("data", "figure_3_8_av.fst"))
+# sim_efficiency_fixed_df <- read_fst(here("data", "figure_3_8_fixed.fst"))
 
 # # Anytime-valid power curve data
 

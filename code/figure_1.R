@@ -3,6 +3,7 @@ suppressPackageStartupMessages({
   library(here)
   library(ggplot2)
   library(readr)
+  library(scales)
 })
 
 source(here("code", "cj.R"))
@@ -68,32 +69,31 @@ suppressWarnings({
       plot_data,
       aes(x = i, y = estimate, ymin = conf.low, ymax = conf.high)
     ) +
-    geom_ribbon(fill = paper_colors$av, alpha = 0.16) +
-    geom_line(color = paper_colors$av, linewidth = 0.45) +
+    geom_ribbon(fill = paper_colors$av, alpha = 0.2) +
+    geom_line(color = paper_colors$av) +
     geom_vline(
       aes(xintercept = first_stat_sig),
       linetype = "dashed",
-      color = paper_colors$conventional,
-      linewidth = 0.35
+      color = "black",
     ) +
     geom_hline(
       aes(yintercept = amce),
       data = truth_lines,
       color = paper_colors$accent,
       linetype = "dashed",
-      linewidth = 0.35
     ) +
     geom_hline(yintercept = 0, linetype = "dotted", color = paper_colors$reference) +
     facet_wrap(~ paste0(attribute, " - ", level), ncol = 2) +
     coord_cartesian(ylim = c(-0.25, 0.25)) +
-    labs(x = "Respondent clusters (G)", y = "AMCE") +
-    conjoint_theme()
+    labs(x = "Number of respondents (G)", y = "AMCE") +
+    scale_x_continuous(labels = label_comma()) +
+    conjoint_theme(base_size = 11)
 
   # Save the results
   save_paper_figure(
     "figure1.png",
     plot = p,
-    width = 8,
-    height = 5
+    width = 6,
+    height = 4
   )
 })

@@ -16,7 +16,7 @@ false_positives <- false_positives |>
     Test = factor(
       Test,
       levels = c("Single region coefficient", "Joint region coefficients"),
-      labels = c("Scalar region null", "Multivariate region null")
+      labels = c("Scalar null", "Multivariate null")
     )
   )
 
@@ -31,12 +31,12 @@ suppressWarnings({
         color = Method
       )
     ) +
-    geom_ribbon(aes(fill = Method), alpha = 0.12, color = NA) +
+    geom_ribbon(aes(fill = Method), alpha = 0.2, color = NA) +
     geom_line(linewidth = 0.6) +
     geom_hline(yintercept = significance_level, linetype = "dashed", color = paper_colors$reference) +
     facet_wrap(~ Test, ncol = 2) +
     labs(
-      x = "Respondent clusters (G)",
+      x = "Number of respondents (G)",
       y = "Cumulative Type I error",
       color = NULL,
       fill = NULL
@@ -44,12 +44,13 @@ suppressWarnings({
     scale_color_manual(values = method_palette) +
     scale_fill_manual(values = method_palette) +
     scale_y_continuous(labels = label_percent(accuracy = 1)) +
-    conjoint_theme()
+    scale_x_continuous(labels = label_comma()) +
+    conjoint_theme(base_size = 11)
 
   save_paper_figure(
     "figure2.png",
     plot = false_positive_plot,
-    width = 8,
-    height = 4.8
+    width = 6,
+    height = 4
   )
 })
