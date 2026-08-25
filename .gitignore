@@ -10,7 +10,6 @@ wheels/
 .venv
 .DS_Store
 
-
 # renv stuff
 renv/
 .Rprofile
@@ -26,3 +25,4 @@ replication/
 .env
 uv.lock
 pyproject.toml
+.claude/
