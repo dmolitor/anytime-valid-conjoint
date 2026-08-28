@@ -14,6 +14,7 @@ options(
   future.globals.maxSize = Inf,
   progressr.enable = TRUE
 )
+fixest::setFixest_nthreads(1)
 
 # Specify conjoint parameters
 tasks_per_respondent <- 1

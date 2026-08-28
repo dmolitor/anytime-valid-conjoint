@@ -10,6 +10,7 @@ suppressPackageStartupMessages({
 source(here("code", "cj.R"))
 
 options(future.globals.maxSize = Inf)
+fixest::setFixest_nthreads(1)
 
 alpha <- 0.05
 lambda <- 100

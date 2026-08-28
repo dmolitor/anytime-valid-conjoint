@@ -21,6 +21,7 @@ options(
   future.globals.maxSize = Inf,
   progressr.enable = TRUE
 )
+fixest::setFixest_nthreads(1)
 
 # Specify conjoint parameters
 tasks_per_respondent <- 1
@@ -29,7 +30,7 @@ number_of_simulations <- 500
 sample_size_grid <- c(3000, 6000, 11000, 18000)
 amce_grid <- seq(0.02, 0.13, by = 0.01)
 attribute_levels_grid <- c(4, 6, 9)
-n_parallel_workers <- NULL # Change this to fewer workers if running out of memory
+n_parallel_workers <- 90 # Change this to fewer workers if running out of memory
 
 ## Run anytime-valid efficiency simulations -----------------------------------
 
