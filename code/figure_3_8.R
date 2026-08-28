@@ -12,7 +12,7 @@ suppressPackageStartupMessages({
 source(here("code", "figure_style.R"))
 
 sample_efficiency_df <- suppressMessages({
-  read_fst(here("data", "figure_3_8_efficiency.fst"))
+  read_fst(here("data", "figure_3_8.fst"))
 }) |>
   as_tibble() |>
   mutate(

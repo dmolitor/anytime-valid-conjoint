@@ -186,5 +186,5 @@ sample_efficiency_df <- sim_efficiency_df |>
   )
 
 suppressMessages({
-  write_fst(sample_efficiency_df, here("data", "figure_3_8_efficiency.fst"))
+  write_fst(sample_efficiency_df, here("data", "figure_3_8.fst"))
 })
