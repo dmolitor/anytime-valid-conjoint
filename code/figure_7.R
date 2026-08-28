@@ -8,7 +8,7 @@ suppressPackageStartupMessages({
 
 source(here("code", "figure_style.R"))
 
-results <- read_csv(here("data", "figure7.csv")) |>
+results <- read_csv(here("data", "figure7.csv"), show_col_types = FALSE) |>
   mutate(
     Test = case_when(
       Test == "Multivariate region null" ~ "Multivariate null",
@@ -19,7 +19,7 @@ results <- read_csv(here("data", "figure7.csv")) |>
 p <- ggplot(results, aes(x = G, y = p_false_positive, color = Method, fill = Method)) +
   geom_ribbon(aes(ymin = ci_low, ymax = ci_high), alpha = 0.3, color = NA) +
   geom_line() +
-  geom_hline(yintercept = alpha, linetype = "dashed", color = paper_colors$reference) +
+  geom_hline(yintercept = 0.05, linetype = "dashed", color = paper_colors$reference) +
   scale_x_log10(labels = label_comma()) +
   scale_y_continuous(labels = label_percent(accuracy = 1), limits = c(0, NA)) +
   scale_color_manual(values = method_palette) +

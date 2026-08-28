@@ -29,6 +29,7 @@ number_of_simulations <- 500
 sample_size_grid <- c(3000, 6000, 11000, 18000)
 amce_grid <- seq(0.02, 0.13, by = 0.01)
 attribute_levels_grid <- c(4, 6, 9)
+n_parallel_workers <- NULL # Change this to fewer workers if running out of memory
 
 ## Run anytime-valid efficiency simulations -----------------------------------
 
@@ -67,8 +68,9 @@ sim_efficiency <- lapply(
             conjoint_sim_power <- cj$power(
               n_sim = number_of_simulations,
               alpha = significance_level,
-              chunk_size = 50,
-              experiment_size = sim_n
+              chunk_size = 100,
+              experiment_size = sim_n,
+              n_workers = n_parallel_workers
             )
             conjoint_sim_power <- mutate(
               conjoint_sim_power,
@@ -123,7 +125,8 @@ sim_efficiency_fixed <- lapply(
             conjoint_sim_power <- cj$power_fixed(
               n_sim = number_of_simulations,
               alpha = significance_level,
-              experiment_size = sim_n
+              experiment_size = sim_n,
+              n_workers = n_parallel_workers
             )
             conjoint_sim_power <- mutate(
               conjoint_sim_power,

@@ -621,10 +621,15 @@ ConjointSim <- R6Class(
       chunk_size = 100, 
       experiment_size = 2000,
       parallel = TRUE,
-      verbose = TRUE
+      verbose = TRUE,
+      n_workers = NULL
     ) {
       power_calc <- function() {
-        if (parallel) plan(multicore)
+        if (!is.null(n_workers)) {
+          if (parallel) plan(multicore, workers = n_workers)
+        } else {
+          if (parallel) plan(multicore)
+        }
         sims <- future_lapply(
           1:n_sim,
           function(sim_iter) {
@@ -653,10 +658,15 @@ ConjointSim <- R6Class(
       alpha = 0.05,
       experiment_size = 2000,
       parallel = TRUE,
-      verbose = TRUE
+      verbose = TRUE,
+      n_workers = NULL
     ) {
       power_calc <- function() {
-        if (parallel) plan(multicore)
+        if (!is.null(n_workers)) {
+          if (parallel) plan(multicore, workers = n_workers)
+        } else {
+          if (parallel) plan(multicore)
+        }
         sims <- future_lapply(
           1:n_sim,
           function(sim_iter) {
