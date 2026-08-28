@@ -181,7 +181,7 @@ suppressWarnings({
       data = annot_df,
       aes(
         x = 0.063, y = 0.18,
-        xend = amce, yend = p_sample_save
+        xend = amce + 0.0005, yend = p_sample_save - 0.02
       ),
       inherit.aes = FALSE,
       curvature = -0.25,
@@ -240,7 +240,7 @@ suppressWarnings({
       data = annot_df,
       aes(
         x = 0.065, y = 0.30,
-        xend = amce, yend = p_early
+        xend = amce + 0.0005, yend = p_early - 0.03
       ),
       inherit.aes = FALSE,
       curvature = -0.25,
