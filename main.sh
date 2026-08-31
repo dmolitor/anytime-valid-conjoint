@@ -19,7 +19,7 @@ echo "---------------------------- code/figure_1.R -----------------"
 Rscript code/figure_1.R
 echo "✔ Done!"
 
-# Replicate simulations for Figures 2, 3/6, 4, 5, and 7
+# Replicate simulations for Figures 2, 3/8, 4, 7, and 9
 
 # ----------------------------------------------------------------------------------------------------
 
@@ -33,13 +33,8 @@ echo "✔ Done!"
 # echo "✔ Done!"
 
 # echo
-# echo "---------------------------- code/figure_2_long_horizon_simulations.R"
-# Rscript code/figure_2_long_horizon_simulations.R
-# echo "✔ Done!"
-
-# echo
-# echo "---------------------------- code/figure_3_6_simulations.R ---"
-# Rscript code/figure_3_6_simulations.R
+# echo "---------------------------- code/figure_3_8_simulations.R ---"
+# Rscript code/figure_3_8_simulations.R
 # echo "✔ Done!"
 
 # echo
@@ -48,8 +43,13 @@ echo "✔ Done!"
 # echo "✔ Done!"
 
 # echo
-# echo "---------------------------- code/figure_5_simulations.R -----"
-# Rscript code/figure_5_simulations.R
+# echo "---------------------------- code/figure_7_simulations.R -----"
+# Rscript code/figure_7_simulations.R
+# echo "✔ Done!"
+
+# echo
+# echo "---------------------------- code/figure_9_simulations.R -----"
+# Rscript code/figure_9_simulations.R
 # echo "✔ Done!"
 
 # ----------------------------------------------------------------------------------------------------
@@ -61,13 +61,8 @@ Rscript code/figure_2.R
 echo "✔ Done!"
 
 echo
-echo "---------------------------- code/figure_2_long_horizon.R ----"
-Rscript code/figure_2_long_horizon.R
-echo "✔ Done!"
-
-echo
-echo "---------------------------- code/figure_3_6.R ---------------"
-Rscript code/figure_3_6.R
+echo "---------------------------- code/figure_3_8.R ---------------"
+Rscript code/figure_3_8.R
 echo "✔ Done!"
 
 echo
@@ -76,8 +71,19 @@ Rscript code/figure_4.R
 echo "✔ Done!"
 
 echo
-echo "---------------------------- code/figure_5.R -----------------"
-Rscript code/figure_5.R
+echo "---------------------------- code/figure_5_6.R ---------------"
+Rscript code/figure_5_6_clean.R
+Rscript code/figure_5_6.R
+echo "✔ Done!"
+
+echo
+echo "---------------------------- code/figure_7.R -----------------"
+Rscript code/figure_7.R
+echo "✔ Done!"
+
+echo
+echo "---------------------------- code/figure_9.R -----------------"
+Rscript code/figure_9.R
 echo "✔ Done!"
 
 end_time=$(date +%s)

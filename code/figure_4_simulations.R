@@ -11,6 +11,7 @@ options(
   future.globals.maxSize = Inf,
   progressr.enable = TRUE
 )
+fixest::setFixest_nthreads(1)
 
 # Specify conjoint parameters
 significance_level <- 0.05
@@ -58,7 +59,7 @@ power <- lapply(
       alpha = significance_level,
       power = target_power,
       levels = target_levels
-    )[["n"]]/2 # We divide by two because we want N = Respondent x Task NOT N = Resp. x Task x (Profile = 2)
+    )[["n"]]/(2 * tasks_per_respondent) # We divide by two * tasks_per_respondent because we want N = Respondent NOT N = Resp. x Task x (Profile = 2)
 
     conjoint_sim_power <- cj$power(
       n_sim = number_of_simulations,

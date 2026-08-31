@@ -15,7 +15,7 @@ method_palette <- c(
   "Anytime-valid" = paper_colors$av,
   "Conventional" = paper_colors$conventional,
   "Anytime-valid (CS)" = paper_colors$av,
-  "Conventional (fixed-n)" = paper_colors$conventional
+  "Conventional (CI)" = paper_colors$conventional
 )
 
 cluster_cap_palette_values <- c("#2F5597", "#2CA25F", "#E17C05", "#8E63A9")
@@ -34,7 +34,6 @@ conjoint_theme <- function(base_size = 10) {
       panel.grid.major = element_line(color = paper_colors$grid, linewidth = 0.25),
       axis.title = element_text(color = "grey20"),
       axis.text = element_text(color = "grey25"),
-      strip.text = element_text(face = "bold", color = "grey20"),
       legend.position = "bottom",
       legend.title = element_blank(),
       plot.title = element_text(face = "bold", hjust = 0),

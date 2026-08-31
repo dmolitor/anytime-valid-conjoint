@@ -1,9 +1,10 @@
 # Ignore everything except this file
 *
 !.gitignore
-!figure_3_6_efficiency.fst
+!figure_3_8.fst
 !figure2.csv
-!figure2_long_horizon.csv
-!figure2_long_horizon_final.csv
 !figure4.fst
 !figure5.csv
+!figure7.csv
+!figure9.csv
+!conjoint_data_2016.csv
