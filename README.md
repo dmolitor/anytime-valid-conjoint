@@ -62,7 +62,6 @@ A Dockerfile is provided for a Docker image with R and all necessary packages in
 .
 ├── code
 │   ├── cj.R                       # Utility functions used across scripts
-│   ├── docker.R                   # Script that creates the Dockerfile
 │   ├── figure_1.R                 # Plot Figure 1
 │   ├── figure_2_simulations.R     # Simulations for Figure 2
 │   ├── figure_2.R                 # Plot Figure 2
@@ -79,8 +78,17 @@ A Dockerfile is provided for a Docker image with R and all necessary packages in
 │   ├── figure_style.R             # Set styling for all figures
 │   └── install_dependencies.R     # Installs all required dependencies
 ├── data                           # Stores all generated intermediate data results
+│   ├── conjoint_data_2016.csv     # Raw data for Bansak et al. case-study
+│   ├── figure_3_8.fst             # Intermediate data for Figures 3 and 8
+│   ├── figure2.csv                # Intermediate data for Figure 2
+│   ├── figure4.fst                # Intermediate data for Figure 4
+│   ├── figure5.csv                # Intermediate data for Figure 5
+│   ├── figure7.csv                # Intermediate data for Figure 7
+│   └── figure9.csv                # Intermediate data for Figure 9
+├── docker.sh                      # Script to create Dockerfile and Binder image
+├── Dockerfile                     # Dockerfile to replicate analysis
 ├── figures                        # Stores all figures
-├── log.txt                        # A log of the full replication run
-├── main.sh                        # Bash script to execute the full replication pipeline
-└── README.md
+├── main.sh                        # Script to execute the full replication pipeline
+├── README.md
+└── renv.lock                      # Lockfile containing all R packages
 ```
