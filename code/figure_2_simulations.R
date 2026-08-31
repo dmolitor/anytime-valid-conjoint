@@ -16,10 +16,10 @@ options(
 )
 
 # Specify conjoint parameters
-tasks_per_respondent <- 1
+tasks_per_respondent <- 2
 significance_level <- 0.05
 number_of_simulations <- 1000
-experiment_size <- 10000
+experiment_size <- 2500
 chunk_size <- 100
 
 null_conjoint <- function(region_levels) {

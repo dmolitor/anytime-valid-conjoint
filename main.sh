@@ -19,7 +19,7 @@ echo "---------------------------- code/figure_1.R -----------------"
 Rscript code/figure_1.R
 echo "✔ Done!"
 
-# Replicate simulations for Figures 2, 3/6, and 5
+# Replicate simulations for Figures 2, 3/6, 4, 5, and 7
 
 # ----------------------------------------------------------------------------------------------------
 
@@ -30,6 +30,11 @@ echo "✔ Done!"
 # echo
 # echo "---------------------------- code/figure_2_simulations.R -----"
 # Rscript code/figure_2_simulations.R
+# echo "✔ Done!"
+
+# echo
+# echo "---------------------------- code/figure_2_long_horizon_simulations.R"
+# Rscript code/figure_2_long_horizon_simulations.R
 # echo "✔ Done!"
 
 # echo
@@ -53,6 +58,11 @@ echo "✔ Done!"
 echo
 echo "---------------------------- code/figure_2.R -----------------"
 Rscript code/figure_2.R
+echo "✔ Done!"
+
+echo
+echo "---------------------------- code/figure_2_long_horizon.R ----"
+Rscript code/figure_2_long_horizon.R
 echo "✔ Done!"
 
 echo
