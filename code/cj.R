@@ -513,9 +513,15 @@ ConjointSim <- R6Class(
       return(out)
     },
 
-    simulate_conjoint = function(alpha = 0.05, chunk_size = 100, experiment_size = 25000, weight_fn = NULL) {
+    simulate_conjoint = function(alpha = 0.05, chunk_size = 100, experiment_size = 25000, weight_fn = NULL, g = NULL) {
       cj_data <- tibble()
       cj_estimates <- tibble()
+
+      # Fix the mixture tuning parameter ONCE, at the planned horizon, before any
+      # data are observed. Re-optimizing it at each interim look would make it a
+      # function of the accumulated sample size and destroy the e-process
+      # guarantee (and would understate the CS width at early looks).
+      if (is.null(g)) g <- optimal_g(experiment_size, alpha)
 
       for (i in seq(0, experiment_size, by = chunk_size)[-1]) {
         cj_data <- bind_rows(cj_data, self$sample(n_respondents = chunk_size)) |>
@@ -538,7 +544,8 @@ ConjointSim <- R6Class(
         cj_tidy <- av_tidy(
           cj_model,
           alpha = alpha,
-          cluster = cj_data$resp_id
+          cluster = cj_data$resp_id,
+          g = g
         ) |>
           mutate(i = i) |>
           filter(term != "(Intercept)")
@@ -622,8 +629,12 @@ ConjointSim <- R6Class(
       experiment_size = 2000,
       parallel = TRUE,
       verbose = TRUE,
-      n_workers = NULL
+      n_workers = NULL,
+      g = NULL
     ) {
+      # Resolve the tuning parameter once, outside the simulation loop, so that
+      # every replicate uses the same horizon-calibrated value.
+      if (is.null(g)) g <- optimal_g(experiment_size, alpha)
       power_calc <- function() {
         if (!is.null(n_workers)) {
           if (parallel) plan(multicore, workers = n_workers)
@@ -636,7 +647,8 @@ ConjointSim <- R6Class(
             sim <- self$simulate_conjoint(
               alpha = alpha,
               chunk_size = chunk_size,
-              experiment_size = experiment_size
+              experiment_size = experiment_size,
+              g = g
             )
             sim <- mutate(sim, sim_iter = sim_iter)
             return(sim)
@@ -721,4 +733,90 @@ retry <- function(expr, n = 3, silent = TRUE) {
     }
   }
   stop(sprintf("Expression failed after %d attempts.", n))
+}
+
+# Solve for Region utility coefficients whose *realized* logit-DGP AMCEs match a
+# target. Under the linear DGP the utility coefficients are themselves AMCEs on
+# the probability scale, so the simulation grid could set them directly. Under
+# the nonlinear logit DGP used throughout the paper they are not, so we solve a
+# one-dimensional root-find per grid cell: the coefficient vector keeps the same
+# relative spread across levels and is scaled until the first Region level
+# attains the target AMCE.
+solve_logit_region_coefs <- function(
+  target,
+  n_levels,
+  respondent_types = c("-0.45" = 0.25, "0" = 0.50, "0.45" = 0.25),
+  spread = 0.01
+) {
+  shape <- seq(target, target + spread, length.out = n_levels + 1)[1:n_levels] / target
+  realized_first <- function(s) {
+    regions <- setNames(s * shape, paste("Region", 1:n_levels))
+    levels <- list(
+      Party = c("Right" = 1/2, "Left" = 1/2),
+      Region = setNames(rep(1/(n_levels + 1), n_levels + 1), c("None", names(regions)))
+    )
+    amces <- list(Party = c("Left" = 0.0), Region = regions)
+    interactions <- matrix(
+      0, 2, n_levels + 1,
+      dimnames = list(c("Right", "Left"), c("None", names(regions)))
+    )
+    compute_logit_amces(levels, amces, interactions, respondent_types)$Region[[1]]
+  }
+  # The realized AMCE is increasing in s only up to s ~ 4, after which the
+  # -0.10 * base^3 term in profile_utility() turns it over and eventually
+  # negative. Bracket strictly inside the increasing region.
+  upper <- 2.5
+  stopifnot(realized_first(upper) > target)
+  root <- uniroot(
+    function(s) realized_first(s) - target,
+    interval = c(1e-6, upper),
+    tol = 1e-12
+  )$root
+  setNames(root * shape, paste("Region", 1:n_levels))
+}
+
+# Vector version of the above: solve for Region utility coefficients whose
+# realized logit-DGP AMCEs match a *vector* of targets, one per non-baseline
+# level. The levels are coupled through the averaging over the profile grid, so
+# a per-level scalar solve is not sufficient; we run a damped fixed-point
+# iteration on the whole coefficient vector.
+solve_logit_region_coefs_vec <- function(
+  targets,
+  respondent_types = c("-0.45" = 0.25, "0" = 0.50, "0.45" = 0.25),
+  tol = 1e-9,
+  max_iter = 200
+) {
+  n_levels <- length(targets)
+  nm <- paste("Region", seq_len(n_levels))
+  realized <- function(co) {
+    regions <- setNames(co, nm)
+    levels <- list(
+      Party = c("Right" = 1/2, "Left" = 1/2),
+      Region = setNames(rep(1/(n_levels + 1), n_levels + 1), c("None", nm))
+    )
+    amces <- list(Party = c("Left" = 0.0), Region = regions)
+    interactions <- matrix(
+      0, 2, n_levels + 1,
+      dimnames = list(c("Right", "Left"), c("None", nm))
+    )
+    as.numeric(compute_logit_amces(levels, amces, interactions, respondent_types)$Region)
+  }
+  # Start from the scalar solve for each target treated in isolation.
+  co <- vapply(targets, function(t) solve_logit_region_coefs(t, 1L, respondent_types)[[1]], numeric(1))
+  for (iter in seq_len(max_iter)) {
+    r <- realized(co)
+    err <- targets - r
+    if (max(abs(err)) < tol) break
+    # Local slope d(AMCE)/d(coef), estimated by finite difference per coordinate.
+    slope <- vapply(seq_len(n_levels), function(k) {
+      h <- max(1e-6, abs(co[k]) * 1e-4)
+      co2 <- co; co2[k] <- co2[k] + h
+      (realized(co2)[k] - r[k]) / h
+    }, numeric(1))
+    co <- co + 0.8 * err / slope
+  }
+  if (max(abs(targets - realized(co))) > 1e-6) {
+    stop("solve_logit_region_coefs_vec failed to converge")
+  }
+  setNames(co, nm)
 }

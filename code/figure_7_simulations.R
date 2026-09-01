@@ -18,7 +18,7 @@ lambda_joint <- optimal_g_multivariate(calibration_G, 3, alpha)
 # A dense grid reduces discrete-monitoring overshoot while remaining computationally
 # feasible. Adjacent standardized null statistics have approximate correlation rho.
 rho <- 0.995
-G_min <- 100
+G_min <- 1
 G_max <- 1e8
 n_sim <- 5000
 seed <- 476816
@@ -29,7 +29,6 @@ G_grid <- unique(as.integer(round(
 )))
 G_grid <- G_grid[G_grid >= G_min & G_grid <= G_max]
 if (tail(G_grid, 1) < G_max) G_grid <- c(G_grid, as.integer(G_max))
-G_grid <- unique(c(5:99, G_grid))
 
 make_cluster_types <- function(region_levels) {
   profile_grid <- expand.grid(
@@ -117,6 +116,12 @@ process_one_design <- function(types, G_grid, lambda_value) {
       next
     }
 
+    d <- length(types$region_terms)
+    if (G <= d) {
+      out[[idx]] <- tibble(G = G, av = FALSE, fixed = FALSE)
+      next
+    }
+
     V <- tryCatch(cluster_vcov(A, beta, counts, types), error = function(e) NULL)
     if (is.null(V)) {
       out[[idx]] <- tibble(G = G, av = FALSE, fixed = FALSE)
@@ -126,7 +131,6 @@ process_one_design <- function(types, G_grid, lambda_value) {
     region_idx <- match(types$region_terms, types$term_names)
     beta_region <- beta[region_idx]
     V_region <- V[region_idx, region_idx, drop = FALSE]
-    d <- length(region_idx)
 
     if (d == 1) {
       Q <- if (is.finite(V_region[1, 1]) && V_region[1, 1] > 0) {
