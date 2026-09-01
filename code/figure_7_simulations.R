@@ -8,14 +8,17 @@ suppressPackageStartupMessages({
 })
 
 source(here("code", "cj.R"))
-
 options(future.globals.maxSize = Inf)
 fixest::setFixest_nthreads(1)
 
 alpha <- 0.05
-lambda <- 100
-rho <- 0.95
-G_min <- 100
+calibration_G <- 2500
+lambda_scalar <- optimal_g(calibration_G, alpha)
+lambda_joint <- optimal_g_multivariate(calibration_G, 3, alpha)
+# A dense grid reduces discrete-monitoring overshoot while remaining computationally
+# feasible. Adjacent standardized null statistics have approximate correlation rho.
+rho <- 0.995
+G_min <- 1
 G_max <- 1e8
 n_sim <- 5000
 seed <- 476816
@@ -26,7 +29,6 @@ G_grid <- unique(as.integer(round(
 )))
 G_grid <- G_grid[G_grid >= G_min & G_grid <= G_max]
 if (tail(G_grid, 1) < G_max) G_grid <- c(G_grid, as.integer(G_max))
-G_grid <- unique(c(5:99, G_grid))
 
 make_cluster_types <- function(region_levels) {
   profile_grid <- expand.grid(
@@ -83,12 +85,9 @@ make_cluster_types <- function(region_levels) {
 
 cluster_vcov <- function(A, beta, counts, types) {
   p <- types$p
-  meat <- matrix(0, p, p)
-  for (h in seq_along(counts)) {
-    if (counts[[h]] == 0) next
-    score <- types$b_mat[h, ] - types$A_array[h, , ] %*% beta
-    meat <- meat + counts[[h]] * tcrossprod(as.numeric(score))
-  }
+  score_mat <- types$b_mat -
+    types$A_mat %*% kronecker(matrix(beta, ncol = 1), diag(p))
+  meat <- crossprod(score_mat, score_mat * counts)
 
   G <- sum(counts)
   N <- 2 * G
@@ -97,7 +96,7 @@ cluster_vcov <- function(A, beta, counts, types) {
   ssc * A_inv %*% meat %*% A_inv
 }
 
-process_one_design <- function(types, G_grid) {
+process_one_design <- function(types, G_grid, lambda_value) {
   counts <- integer(length(types$prob))
   previous_G <- 0L
   out <- vector("list", length(G_grid))
@@ -117,6 +116,12 @@ process_one_design <- function(types, G_grid) {
       next
     }
 
+    d <- length(types$region_terms)
+    if (G <= d) {
+      out[[idx]] <- tibble(G = G, av = FALSE, fixed = FALSE)
+      next
+    }
+
     V <- tryCatch(cluster_vcov(A, beta, counts, types), error = function(e) NULL)
     if (is.null(V)) {
       out[[idx]] <- tibble(G = G, av = FALSE, fixed = FALSE)
@@ -126,7 +131,6 @@ process_one_design <- function(types, G_grid) {
     region_idx <- match(types$region_terms, types$term_names)
     beta_region <- beta[region_idx]
     V_region <- V[region_idx, region_idx, drop = FALSE]
-    d <- length(region_idx)
 
     if (d == 1) {
       Q <- if (is.finite(V_region[1, 1]) && V_region[1, 1] > 0) {
@@ -138,7 +142,7 @@ process_one_design <- function(types, G_grid) {
         p_av <- NA_real_
         p_fixed <- NA_real_
       } else {
-        p_av <- p_G_t(log_G_t(Q, G, lambda))
+        p_av <- p_G_t(log_G_t(Q, G, lambda_value))
         p_fixed <- 2 * stats::pt(sqrt(Q), df = G - 1, lower.tail = FALSE)
       }
     } else {
@@ -150,7 +154,7 @@ process_one_design <- function(types, G_grid) {
         p_av <- NA_real_
         p_fixed <- NA_real_
       } else {
-        p_av <- p_G_t(log_G_multivariate_t(Q, G, lambda, d))
+        p_av <- p_G_t(log_G_multivariate_t(Q, G, lambda_value, d))
         p_fixed <- stats::pf(Q / d, df1 = d, df2 = G - d, lower.tail = FALSE)
       }
     }
@@ -173,7 +177,7 @@ scalar_types <- make_cluster_types(c("North", "South"))
 multivariate_types <- make_cluster_types(c("North", "South", "East", "West"))
 
 simulate_one <- function(iter) {
-  scalar <- process_one_design(scalar_types, G_grid) |>
+  scalar <- process_one_design(scalar_types, G_grid, lambda_scalar) |>
     transmute(
       sim_iter = iter,
       G,
@@ -182,7 +186,11 @@ simulate_one <- function(iter) {
       Conventional = fixed
     )
 
-  multivariate <- process_one_design(multivariate_types, G_grid) |>
+  multivariate <- process_one_design(
+    multivariate_types,
+    G_grid,
+    lambda_joint
+  ) |>
     transmute(
       sim_iter = iter,
       G,
@@ -214,7 +222,12 @@ results <- bind_rows(sims) |>
   ) |>
   mutate(
     rho = rho,
-    lambda = lambda,
+    lambda = if_else(
+      Test == "Scalar region null",
+      lambda_scalar,
+      lambda_joint
+    ),
+    calibration_G = calibration_G,
     n_sim = n_sim
   )
 

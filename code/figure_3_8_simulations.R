@@ -24,13 +24,13 @@ options(
 fixest::setFixest_nthreads(1)
 
 # Specify conjoint parameters
-tasks_per_respondent <- 1
+tasks_per_respondent <- 2
 significance_level <- 0.05
 number_of_simulations <- 500
 sample_size_grid <- c(3000, 6000, 11000, 18000)
 amce_grid <- seq(0.02, 0.13, by = 0.01)
 attribute_levels_grid <- c(4, 6, 9)
-n_parallel_workers <- 90 # Change this to fewer workers if running out of memory
+n_parallel_workers <- 12 # Change this to fewer workers if running out of memory
 
 ## Run anytime-valid efficiency simulations -----------------------------------
 
@@ -44,9 +44,9 @@ sim_efficiency <- lapply(
         lapply(
           amce_grid,
           function(amce) {
-            amce_grid <- seq(amce, amce + 0.01, length.out = n_levels + 1)[1:n_levels]
-            # Setup the conjoint object
-            regions <- setNames(amce_grid, paste("Region", 1:n_levels))
+            # Scale a proportionally spaced utility-coefficient vector so that
+            # its first realized AMCE matches the nominal grid value (see cj.R).
+            regions <- solve_logit_region_coefs(amce, n_levels)
             amces <- list(
               Party = c("Left" = 0.0),
               Region = regions
@@ -63,7 +63,8 @@ sim_efficiency <- lapply(
               ),
               amces = amces,
               interactions = interactions,
-              n_tasks = tasks_per_respondent
+              n_tasks = tasks_per_respondent,
+              dgp = "logit"
             )
             # Simulate the conjoint power
             conjoint_sim_power <- cj$power(
@@ -101,9 +102,9 @@ sim_efficiency_fixed <- lapply(
         lapply(
           amce_grid,
           function(amce) {
-            amce_grid <- seq(amce, amce + 0.01, length.out = n_levels + 1)[1:n_levels]
-            # Setup the conjoint object
-            regions <- setNames(amce_grid, paste("Region", 1:n_levels))
+            # Scale a proportionally spaced utility-coefficient vector so that
+            # its first realized AMCE matches the nominal grid value (see cj.R).
+            regions <- solve_logit_region_coefs(amce, n_levels)
             amces <- list(
               Party = c("Left" = 0.0),
               Region = regions
@@ -120,7 +121,8 @@ sim_efficiency_fixed <- lapply(
               ),
               amces = amces,
               interactions = interactions,
-              n_tasks = tasks_per_respondent
+              n_tasks = tasks_per_respondent,
+              dgp = "logit"
             )
             # Simulate the conjoint power
             conjoint_sim_power <- cj$power_fixed(

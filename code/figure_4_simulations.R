@@ -16,7 +16,7 @@ fixest::setFixest_nthreads(1)
 # Specify conjoint parameters
 significance_level <- 0.05
 target_power <- 0.8
-tasks_per_respondent <- 1
+tasks_per_respondent <- 2
 target_levels <- 6
 number_of_simulations <- 1000
 
@@ -30,8 +30,10 @@ set.seed(641423)
 power <- lapply(
   amce_grid,
   function(amce) {
-    true_amces <- ratio_grid*amce
-    regions <- setNames(true_amces, paste("Region", 1:length(true_amces)))
+    # Utility coefficients chosen so that the realized AMCEs under the nonlinear
+    # logit DGP equal ratio_grid * amce, i.e. the true effect exceeds the
+    # powered-for target by each ratio in turn.
+    regions <- solve_logit_region_coefs_vec(ratio_grid * amce)
     amces <- list(
       Party = c("Left" = 0.0),
       Region = regions
@@ -51,7 +53,8 @@ power <- lapply(
       ),
       amces = amces,
       interactions = interactions,
-      n_tasks = tasks_per_respondent
+      n_tasks = tasks_per_respondent,
+      dgp = "logit"
     )
     # Calculate fixed-N conjoint power (see Schuessler & Freitag)
     exp_size <- cjpowr_amce(
@@ -61,10 +64,14 @@ power <- lapply(
       levels = target_levels
     )[["n"]]/(2 * tasks_per_respondent) # We divide by two * tasks_per_respondent because we want N = Respondent NOT N = Resp. x Task x (Profile = 2)
 
+    # The tuning parameter is calibrated to the horizon the researcher actually
+    # planned for -- the powered-for fixed-sample size -- not to the extended
+    # monitoring window, and is fixed before monitoring begins.
     conjoint_sim_power <- cj$power(
       n_sim = number_of_simulations,
       alpha = significance_level,
-      experiment_size = 5 * exp_size
+      experiment_size = 5 * exp_size,
+      g = optimal_g(ceiling(exp_size), significance_level)
     )
     conjoint_sim_power <- conjoint_sim_power |> 
       mutate(target = .env$amce, fixed_n = ceiling(exp_size))
