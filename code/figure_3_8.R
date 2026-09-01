@@ -16,14 +16,13 @@ sample_efficiency_df <- suppressMessages({
 }) |>
   as_tibble() |>
   mutate(
-    G_cap = as.integer(sub("^N:\\s*", "", as.character(N))),
-    G_max = factor(
-      paste("Gmax:", comma(G_cap)),
-      levels = paste("Gmax:", comma(sort(unique(G_cap))))
+    N_max = factor(
+      paste("Nmax:", comma(N)),
+      levels = paste("Nmax:", comma(sort(unique(N))))
     )
   )
 
-cluster_cap_colors <- cluster_cap_palette(levels(sample_efficiency_df$G_max))
+cluster_cap_colors <- cluster_cap_palette(levels(sample_efficiency_df$N_max))
 
 ## Appendix Figure 8 ----------------------------------------------------------
 
@@ -38,7 +37,7 @@ suppressWarnings({
         y = p_sample_save,
         ymin = p_sample_save_lb,
         ymax = p_sample_save_ub,
-        color = G_max
+        color = N_max
       )
     ) +
     geom_line(linewidth = 0.5, alpha = 0.3) +
@@ -79,7 +78,7 @@ suppressWarnings({
       y = p_early,
       ymin = p_early_lb,
       ymax = p_early_ub,
-      color = G_max
+      color = N_max
     )
   ) +
     geom_point(alpha = 0.3, size = 0.6) +
@@ -135,7 +134,7 @@ annot_amce <- 0.05
 
 # Pull the nearest observed point for each panel
 annot_df <- sample_efficiency_df |>
-  filter(n_lev == "Attribute levels: 6", G_cap == annot_n) |>
+  filter(n_lev == "Attribute levels: 6", N == annot_n) |>
   mutate(dist = abs(amce - annot_amce)) |>
   arrange(dist) |>
   slice(1)
@@ -146,12 +145,12 @@ annot_p_save <- round(annot_df$p_sample_save[[1]], 2)
 annot_n_save <- signif(annot_n * annot_p_save, digits = 2)
 
 annot_label_early <- glue(
-  "At Gmax = {comma(annot_n)} and AMCE = {number(annot_df$amce[[1]], accuracy = 0.01)},\n",
+  "At Nmax = {comma(annot_n)} and AMCE = {number(annot_df$amce[[1]], accuracy = 0.01)},\n",
   "Pr(early stopping) = {percent(annot_p_early, accuracy = 1)}"
 )
 
 annot_label_save <- glue(
-  "Gmax = {comma(annot_n)}, AMCE = {number(annot_df$amce[[1]], accuracy = 0.01)}\n",
+  "Nmax = {comma(annot_n)}, AMCE = {number(annot_df$amce[[1]], accuracy = 0.01)}\n",
   "Mean sample saved = {percent(annot_p_save, accuracy = 1)}\n",
   "(about {comma(annot_n_save)} respondents)"
 )
@@ -164,7 +163,7 @@ suppressWarnings({
         y = p_sample_save,
         ymin = p_sample_save_lb,
         ymax = p_sample_save_ub,
-        color = G_max
+        color = N_max
       )
     ) +
     geom_line(linewidth = 0.5, alpha = 0.3) +
@@ -223,7 +222,7 @@ suppressWarnings({
       y = p_early,
       ymin = p_early_lb,
       ymax = p_early_ub,
-      color = G_max
+      color = N_max
     )
   ) +
     geom_point(alpha = 0.3, size = 0.6) +

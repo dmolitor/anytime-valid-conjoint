@@ -27,10 +27,10 @@ fixest::setFixest_nthreads(1)
 tasks_per_respondent <- 2
 significance_level <- 0.05
 number_of_simulations <- 500
-sample_size_grid <- c(3000, 6000, 11000, 18000)
+sample_size_grid <- c(3000, 6000, 11000, 18000)/tasks_per_respondent
 amce_grid <- seq(0.02, 0.13, by = 0.01)
 attribute_levels_grid <- c(4, 6, 9)
-n_parallel_workers <- 12 # Change this to fewer workers if running out of memory
+n_parallel_workers <- NULL # Set this to a small number of workers (e.g. 2) if running out of memory
 
 ## Run anytime-valid efficiency simulations -----------------------------------
 
@@ -46,16 +46,16 @@ sim_efficiency <- lapply(
           function(amce) {
             # Scale a proportionally spaced utility-coefficient vector so that
             # its first realized AMCE matches the nominal grid value (see cj.R).
-            regions <- solve_logit_region_coefs(amce, n_levels)
+            regions <- solve_logit_region_coefs(amce, n_levels - 1)
             amces <- list(
               Party = c("Left" = 0.0),
               Region = regions
             )
             interactions <- matrix(
-              rep(0, 2*(n_levels + 1)), 2, (n_levels + 1),
+              rep(0, 2*n_levels), 2, n_levels,
               dimnames = list(c("Right", "Left"), c("None", names(regions)))
             )
-            regions_probs <- setNames(rep(1/(n_levels + 1), (n_levels + 1)), c("None", names(regions)))
+            regions_probs <- setNames(rep(1/n_levels, n_levels), c("None", names(regions)))
             cj <- ConjointSim$new(
               levels = list(
                 Party = c("Right" = 1/2, "Left" = 1/2),
@@ -76,7 +76,7 @@ sim_efficiency <- lapply(
             )
             conjoint_sim_power <- mutate(
               conjoint_sim_power,
-              N = sim_n,
+              N = sim_n * tasks_per_respondent,
               n_lev = n_levels
             )
             return(conjoint_sim_power)
@@ -104,16 +104,16 @@ sim_efficiency_fixed <- lapply(
           function(amce) {
             # Scale a proportionally spaced utility-coefficient vector so that
             # its first realized AMCE matches the nominal grid value (see cj.R).
-            regions <- solve_logit_region_coefs(amce, n_levels)
+            regions <- solve_logit_region_coefs(amce, n_levels - 1)
             amces <- list(
               Party = c("Left" = 0.0),
               Region = regions
             )
             interactions <- matrix(
-              rep(0, 2*(n_levels + 1)), 2, (n_levels + 1),
+              rep(0, 2*n_levels), 2, n_levels,
               dimnames = list(c("Right", "Left"), c("None", names(regions)))
             )
-            regions_probs <- setNames(rep(1/(n_levels + 1), (n_levels + 1)), c("None", names(regions)))
+            regions_probs <- setNames(rep(1/n_levels, n_levels), c("None", names(regions)))
             cj <- ConjointSim$new(
               levels = list(
                 Party = c("Right" = 1/2, "Left" = 1/2),
@@ -133,7 +133,7 @@ sim_efficiency_fixed <- lapply(
             )
             conjoint_sim_power <- mutate(
               conjoint_sim_power,
-              N = sim_n,
+              N = sim_n * tasks_per_respondent,
               n_lev = n_levels
             )
             return(conjoint_sim_power)
@@ -183,10 +183,7 @@ sample_efficiency_df <- sim_efficiency_df |>
     .groups = "drop_last"
   ) |>
   ungroup() |>
-  mutate(
-    n_lev = factor(paste("Attribute levels:", n_lev)),
-    N = factor(paste("N:", N), levels = paste("N:", unique(sim_efficiency_df$N)))
-  )
+  mutate(n_lev = factor(paste("Attribute levels:", n_lev)))
 
 suppressMessages({
   write_fst(sample_efficiency_df, here("data", "figure_3_8.fst"))

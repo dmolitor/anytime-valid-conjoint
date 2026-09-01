@@ -22,7 +22,7 @@ number_of_simulations <- 1000
 
 # amce_grid <- seq(0.01, 0.05, length.out = 9); # Run this if you want a full grid of target AMCE values
 amce_grid <- 0.03
-ratio_grid <- c(1, 1.25, 1.5, 2, 2.5, 3)
+ratio_grid <- c(1, 1.5, 2, 2.5, 3)
 
 ## Calculate the empirical performance across a grid of AMCE values -----------
 
@@ -39,11 +39,11 @@ power <- lapply(
       Region = regions
     )
     interactions <- matrix(
-      rep(0, 2*(target_levels + 1)), 2, (target_levels + 1),
+      rep(0, 2*target_levels), 2, target_levels,
       dimnames = list(c("Right", "Left"), c("None", names(regions)))
     )
     regions_probs <- setNames(
-      rep(1/(target_levels + 1), (target_levels + 1)),
+      rep(1/target_levels, target_levels),
       c("None", names(regions))
     )
     cj <- ConjointSim$new(
