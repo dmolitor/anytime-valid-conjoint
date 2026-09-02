@@ -20,6 +20,7 @@ resources/
 
 # Replication outputs/inputs
 log.txt
+aws-log.txt
 replication/
 
 .env
