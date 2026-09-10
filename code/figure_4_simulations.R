@@ -22,18 +22,21 @@ number_of_simulations <- 1000
 
 # amce_grid <- seq(0.01, 0.05, length.out = 9); # Run this if you want a full grid of target AMCE values
 amce_grid <- 0.03
-ratio_grid <- c(1, 1.5, 2, 2.5, 3)
+ratio_grid1 <- seq(1, 2, by = .25)
+ratio_grid2 <- seq(2.25, 3.25, by = .25)
 
 ## Calculate the empirical performance across a grid of AMCE values -----------
 
 set.seed(641423)
-power <- lapply(
+
+### Empirical performance over first half-grid
+power1 <- lapply(
   amce_grid,
   function(amce) {
     # Utility coefficients chosen so that the realized AMCEs under the nonlinear
     # logit DGP equal ratio_grid * amce, i.e. the true effect exceeds the
     # powered-for target by each ratio in turn.
-    regions <- solve_logit_region_coefs_vec(ratio_grid * amce)
+    regions <- solve_logit_region_coefs_vec(ratio_grid1 * amce)
     amces <- list(
       Party = c("Left" = 0.0),
       Region = regions
@@ -80,7 +83,61 @@ power <- lapply(
   }
 )
 
-power_df <- bind_rows(power)
+### Empirical performance over second half-grid
+power2 <- lapply(
+  amce_grid,
+  function(amce) {
+    # Utility coefficients chosen so that the realized AMCEs under the nonlinear
+    # logit DGP equal ratio_grid * amce, i.e. the true effect exceeds the
+    # powered-for target by each ratio in turn.
+    regions <- solve_logit_region_coefs_vec(ratio_grid2 * amce)
+    amces <- list(
+      Party = c("Left" = 0.0),
+      Region = regions
+    )
+    interactions <- matrix(
+      rep(0, 2*target_levels), 2, target_levels,
+      dimnames = list(c("Right", "Left"), c("None", names(regions)))
+    )
+    regions_probs <- setNames(
+      rep(1/target_levels, target_levels),
+      c("None", names(regions))
+    )
+    cj <- ConjointSim$new(
+      levels = list(
+        Party = c("Right" = 1/2, "Left" = 1/2),
+        Region = regions_probs
+      ),
+      amces = amces,
+      interactions = interactions,
+      n_tasks = tasks_per_respondent,
+      dgp = "logit"
+    )
+    # Calculate fixed-N conjoint power (see Schuessler & Freitag)
+    exp_size <- cjpowr_amce(
+      amce,
+      alpha = significance_level,
+      power = target_power,
+      levels = target_levels
+    )[["n"]]/(2 * tasks_per_respondent) # We divide by two * tasks_per_respondent because we want N = Respondent NOT N = Resp. x Task x (Profile = 2)
+
+    # The tuning parameter is calibrated to the horizon the researcher actually
+    # planned for -- the powered-for fixed-sample size -- not to the extended
+    # monitoring window, and is fixed before monitoring begins.
+    conjoint_sim_power <- cj$power(
+      n_sim = number_of_simulations,
+      alpha = significance_level,
+      experiment_size = 5 * exp_size,
+      g = optimal_g(ceiling(exp_size), significance_level)
+    )
+    conjoint_sim_power <- conjoint_sim_power |> 
+      mutate(target = .env$amce, fixed_n = ceiling(exp_size))
+
+    return(conjoint_sim_power)
+  }
+)
+
+power_df <- bind_rows(bind_rows(power1), bind_rows(power2))
 
 power_df <- power_df |>
   filter(attribute == "Region") |>
@@ -88,6 +145,7 @@ power_df <- power_df |>
     stat_sig = 0 < conf.low | 0 > conf.high,
     overshoot_ratio = round(amce / target, 2)
   ) |>
+  filter(overshoot_ratio <= 3.0) |>
   group_by(attribute, level, sim_iter, amce, target) |>
   summarize(
     type2_error = all(!stat_sig),
