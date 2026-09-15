@@ -20,7 +20,7 @@ p <- ggplot(results, aes(x = G, y = p_false_positive, color = Method, fill = Met
   geom_ribbon(aes(ymin = ci_low, ymax = ci_high), alpha = 0.3, color = NA) +
   geom_line() +
   geom_hline(yintercept = 0.05, linetype = "dashed", color = paper_colors$reference) +
-  scale_x_log10(labels = label_comma()) +
+  scale_x_log10(labels = label_scientific()) +
   scale_y_continuous(labels = label_percent(accuracy = 1), limits = c(0, NA)) +
   scale_color_manual(values = method_palette) +
   scale_fill_manual(values = method_palette) +
