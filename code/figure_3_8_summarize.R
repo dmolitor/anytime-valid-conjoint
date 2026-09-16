@@ -11,12 +11,16 @@
 #
 # Units. In cj.R the interim index `i` counts respondents (clusters): one
 # interim analysis every `chunk_size` respondents, up to `experiment_size`
-# respondents. The cap `N` recorded by figure_3_8_simulations.R is the effective
-# sample size N_max = respondents x tasks. Both are put on the same (effective)
-# scale below before a stopping time is compared with, or divided by, N_max.
-# An earlier version compared `i` (respondents) directly with `N` (effective
+# respondents, and every interim analysis is recorded whether or not the
+# confidence sequence has excluded zero. The respondent horizon of a run is
+# therefore G_max = max(i), and all stopping-time quantities below are computed
+# in respondents against G_max. The cap `N` stored by figure_3_8_simulations.R
+# (the effective sample size, respondents x tasks, since commit 0f32496; the
+# respondent count before it) is carried through for labelling only, so the
+# summary is correct for per-replication files produced by either version.
+# An earlier summary compared `i` (respondents) directly with `N` (effective
 # units), which credited a run stopping at respondent i with savings of
-# 1 - i/N_max instead of 1 - i/G_max, and counted a first crossing at the final
+# 1 - i/N instead of 1 - i/G_max, and counted a first crossing at the final
 # interim analysis as an early stop.
 
 suppressPackageStartupMessages({
@@ -25,9 +29,6 @@ suppressPackageStartupMessages({
   library(fst)
 })
 
-# Must match the value used in figure_3_8_simulations.R.
-if (!exists("tasks_per_respondent")) tasks_per_respondent <- 2
-
 sim_efficiency_df <- read_fst(here("data", "figure_3_8_av.fst"))
 
 sample_efficiency_df <- sim_efficiency_df |>
@@ -35,30 +36,32 @@ sample_efficiency_df <- sim_efficiency_df |>
   mutate(stat_sig = 0 < conf.low | 0 > conf.high) |>
   group_by(n_lev, attribute, level, sim_iter, amce, N) |>
   summarize(
-    # Stopping time in effective-sample-size units (respondents x tasks), i.e.
-    # the units of N. A run that never stops is assigned N (no savings).
+    # Respondent horizon of the run and stopping time in respondents. A run
+    # whose confidence sequence never excludes zero is assigned G_max (no
+    # savings); a first crossing at the final look is not an early stop.
+    G_max = max(i),
     early_stop = if (any(stat_sig)) {
-      i[min(which(stat_sig))] * tasks_per_respondent
+      i[min(which(stat_sig))]
     } else {
-      first(N)
+      max(i)
     },
-    N_effective = first(N),
     .groups = "drop"
   ) |>
   ungroup() |>
   group_by(n_lev, attribute, level, amce, N) |>
   summarize(
+    G_max = first(G_max),
     median_stop = median(early_stop),
     mean_stop = mean(early_stop),
     mean_stop_se = sd(early_stop)/sqrt(n()),
     mean_stop_lb = mean_stop - 1.96*mean_stop_se,
     mean_stop_ub = mean_stop + 1.96*mean_stop_se,
-    p_early = mean(early_stop < N_effective),
-    p_early_se = sd(early_stop < N_effective)/sqrt(n()),
+    p_early = mean(early_stop < G_max),
+    p_early_se = sd(early_stop < G_max)/sqrt(n()),
     p_early_lb = p_early - 1.96*p_early_se,
     p_early_ub = p_early + 1.96*p_early_se,
-    p_sample_save = mean(1 - early_stop/N_effective),
-    p_sample_save_se = sd(1 - early_stop/N_effective)/sqrt(n()),
+    p_sample_save = mean(1 - early_stop/G_max),
+    p_sample_save_se = sd(1 - early_stop/G_max)/sqrt(n()),
     p_sample_save_lb = p_sample_save - 1.96*p_sample_save_se,
     p_sample_save_ub = p_sample_save + 1.96*p_sample_save_se,
     .groups = "drop_last"
