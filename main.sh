@@ -37,6 +37,13 @@ echo "✔ Done!"
 # Rscript code/figure_3_8_simulations.R
 # echo "✔ Done!"
 
+## The summary for Figures 3 and 8 can be rebuilt from the saved per-replication
+## results (data/figure_3_8_av.fst) without re-running the simulations:
+# echo
+# echo "---------------------------- code/figure_3_8_summarize.R -----"
+# Rscript code/figure_3_8_summarize.R
+# echo "✔ Done!"
+
 # echo
 # echo "---------------------------- code/figure_4_simulations.R -----"
 # Rscript code/figure_4_simulations.R

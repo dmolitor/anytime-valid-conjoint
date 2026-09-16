@@ -142,7 +142,10 @@ annot_df <- sample_efficiency_df |>
 # Values for labels
 annot_p_early <- round(annot_df$p_early[[1]], 2)
 annot_p_save <- round(annot_df$p_sample_save[[1]], 2)
-annot_n_save <- signif(annot_n * annot_p_save, digits = 2)
+# N_max is an effective sample size (respondents x tasks); convert the saved
+# share of N_max into respondents for the label.
+tasks_per_respondent <- 2 # must match figure_3_8_simulations.R
+annot_n_save <- signif(annot_n * annot_p_save / tasks_per_respondent, digits = 2)
 
 annot_label_early <- glue(
   "At Nmax = {comma(annot_n)} and AMCE = {number(annot_df$amce[[1]], accuracy = 0.01)},\n",
