@@ -151,40 +151,8 @@ suppressMessages({
 
 ## Calculate the sample-efficiency of both methods ----------------------------
 
-sample_efficiency_df <- sim_efficiency_df |>
-  filter(attribute == "Region", amce <= 0.12001) |> # set to 0.12001 for floating point inclusion
-  mutate(stat_sig = 0 < conf.low | 0 > conf.high) |>
-  group_by(n_lev, attribute, level, sim_iter, amce, N) |>
-  summarize(
-    early_stop = if (any(stat_sig)) {
-      i[min(which(stat_sig))]
-    } else {
-      first(N)
-    },
-    N_effective = first(N),
-    .groups = "drop"
-  ) |>
-  ungroup() |>
-  group_by(n_lev, attribute, level, amce, N) |>
-  summarize(
-    median_stop = median(early_stop),
-    mean_stop = mean(early_stop),
-    mean_stop_se = sd(early_stop)/sqrt(n()),
-    mean_stop_lb = mean_stop - 1.96*mean_stop_se,
-    mean_stop_ub = mean_stop + 1.96*mean_stop_se,
-    p_early = mean(early_stop < N_effective),
-    p_early_se = sd(early_stop < N_effective)/sqrt(n()),
-    p_early_lb = p_early - 1.96*p_early_se,
-    p_early_ub = p_early + 1.96*p_early_se,
-    p_sample_save = mean(1 - early_stop/N_effective),
-    p_sample_save_se = sd(1 - early_stop/N_effective)/sqrt(n()),
-    p_sample_save_lb = p_sample_save - 1.96*p_sample_save_se,
-    p_sample_save_ub = p_sample_save + 1.96*p_sample_save_se,
-    .groups = "drop_last"
-  ) |>
-  ungroup() |>
-  mutate(n_lev = factor(paste("Attribute levels:", n_lev)))
-
-suppressMessages({
-  write_fst(sample_efficiency_df, here("data", "figure_3_8.fst"))
-})
+# The summary step lives in its own script so that it can be re-run on the saved
+# per-replication results without repeating the simulations. It converts the
+# respondent-indexed stopping times to the effective-sample-size units of `N`
+# before computing early-stopping probabilities and mean sample savings.
+source(here("code", "figure_3_8_summarize.R"))

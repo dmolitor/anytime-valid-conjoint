@@ -66,7 +66,8 @@ A Dockerfile is provided for a Docker image with R and all necessary packages in
 │   ├── figure_2_simulations.R     # Simulations for Figure 2
 │   ├── figure_2.R                 # Plot Figure 2
 │   ├── figure_3_8_simulations.R   # Simulations for Figures 3 and 8
-│   ├── figure_3_8.R               # Plot Figures 3 and 6
+│   ├── figure_3_8_summarize.R     # Summarize simulations for Figures 3 and 8
+│   ├── figure_3_8.R               # Plot Figures 3 and 8
 │   ├── figure_4_simulations.R     # Simulations for Figure 4
 │   ├── figure_4.R                 # Plot Figure 4
 │   ├── figure_5_6_clean.R         # Clean data for Figures 5 and 6

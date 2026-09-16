@@ -142,7 +142,12 @@ annot_df <- sample_efficiency_df |>
 # Values for labels
 annot_p_early <- round(annot_df$p_early[[1]], 2)
 annot_p_save <- round(annot_df$p_sample_save[[1]], 2)
-annot_n_save <- signif(annot_n * annot_p_save, digits = 2)
+# Savings are a share of the respondent horizon G_max (N_max is an effective
+# sample size, respondents x tasks); the label reports respondents.
+if (!"G_max" %in% names(annot_df)) {
+  stop("data/figure_3_8.fst has no G_max column; regenerate it with code/figure_3_8_summarize.R")
+}
+annot_n_save <- signif(annot_df$G_max[[1]] * annot_p_save, digits = 2)
 
 annot_label_early <- glue(
   "At Nmax = {comma(annot_n)} and AMCE = {number(annot_df$amce[[1]], accuracy = 0.01)},\n",
