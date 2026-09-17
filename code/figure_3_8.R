@@ -179,7 +179,7 @@ suppressWarnings({
     geom_curve(
       data = annot_df,
       aes(
-        x = 0.063, y = 0.18,
+        x = 0.068, y = 0.12,
         xend = amce + 0.0005, yend = p_sample_save - 0.02
       ),
       inherit.aes = FALSE,
@@ -190,7 +190,7 @@ suppressWarnings({
     ) +
     annotate(
       "text",
-      x = 0.0632,
+      x = 0.07,
       y = 0.16,
       label = annot_label_save,
       hjust = 0,
