@@ -157,7 +157,7 @@ sample_efficiency_df <- sim_efficiency_df |>
   group_by(n_lev, attribute, level, sim_iter, amce, N) |>
   summarize(
     early_stop = if (any(stat_sig)) {
-      i[min(which(stat_sig))]
+      i[min(which(stat_sig))] * tasks_per_respondent
     } else {
       first(N)
     },

@@ -152,7 +152,7 @@ annot_label_early <- glue(
 annot_label_save <- glue(
   "Nmax = {comma(annot_n)}, AMCE = {number(annot_df$amce[[1]], accuracy = 0.01)}\n",
   "Mean sample saved = {percent(annot_p_save, accuracy = 1)}\n",
-  "(about {comma(annot_n_save)} respondents)"
+  "(about {comma(annot_n_save)} observations)"
 )
 
 suppressWarnings({
