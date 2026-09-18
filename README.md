@@ -92,3 +92,8 @@ A Dockerfile is provided for a Docker image with R and all necessary packages in
 ├── README.md
 └── renv.lock                      # Lockfile containing all R packages
 ```
+
+## Built with tugboat
+
+The Docker image and Binder configuration for this repository was generated
+[with tugboat](https://github.com/dmolitor/tugboat-cli).
