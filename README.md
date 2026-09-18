@@ -9,9 +9,9 @@ Replication materials for [Anytime-Valid Inference in Conjoint Experiments (Moli
 ## Code and data description
 
 All raw data and intermediate data outputs required to replicate the 
-empirical results in this paper will be stored in the `/data` directory.
-Corresponding code can be found in the `code/` directory. 
-All figures will be stored in the `figures/` directory.
+empirical results in this paper will be stored in the `data` directory.
+Corresponding code can be found in the `code` directory. 
+All figures will be stored in the `figures` directory.
 
 ## Replicating figures - Binder
 
