@@ -41,8 +41,8 @@ p_G_t <- function(log_G_t_values) {
 }
 
 f_radius <- function(g, G, d, alpha) {
-  nu <- G - d
-  if (nu <= 0) stop("G must be greater than d.")
+  nu <- G - 1
+  if (nu <= 0) stop("G must be greater than 1.")
   T <- g / (g + G)
   powered_term <- (T * alpha^(2 / d))^(d / (nu + d))
   numerator <- (nu / d) * (1 - powered_term)
@@ -51,18 +51,18 @@ f_radius <- function(g, G, d, alpha) {
 }
 
 log_G_multivariate_t <- function(Q, G, g, d) {
-  nu <- G - d
-  if (nu <= 0) stop("G must be greater than d.")
+  nu <- G - 1
+  if (nu <= 0) stop("G must be greater than 1.")
   r <- g / (g + G)
   (d / 2) * log(r) +
     (0.5 * (nu + d)) * (log(1 + Q / nu) - log(1 + r * Q / nu))
 }
 
 optimal_g_multivariate <- function(G, d, alpha) {
-  if (G <= d) stop("G must be greater than d.")
+  if (G <= 1) stop("G must be greater than 1.")
   if (alpha < 0 || alpha > 1) stop("alpha must be in (0,1).")
 
-  nu <- G - d
+  nu <- G - 1
   upper_bound <- G * alpha^(2 / nu) / (1 - alpha^(2 / nu))
   lower_bound <- 1
 

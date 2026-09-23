@@ -95,5 +95,5 @@ A Dockerfile is provided for a Docker image with R and all necessary packages in
 
 ## Built with tugboat
 
-The Docker image and Binder configuration for this repository was generated
+The Docker image and Binder configuration for this repository were generated
 [with tugboat](https://github.com/dmolitor/tugboat-cli).
