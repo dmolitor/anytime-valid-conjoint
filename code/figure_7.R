@@ -34,4 +34,4 @@ p <- ggplot(results, aes(x = G, y = p_false_positive, color = Method, fill = Met
   ) +
   conjoint_theme()
 
-save_paper_figure("figure7.png", p, width = 6, height = 4, dpi = 500)
+save_paper_figure("figure7.png", p, width = 6, height = 4)

@@ -116,10 +116,9 @@ suppressWarnings({
     plot_layout(ncol = 2, guides = "collect") &
     theme(legend.position = "bottom")
 
-  ggsave(
-    here("figures", "figure8.png"),
+  save_paper_figure(
+    "figure8.png",
     plot = sample_efficiency_plot,
-    dpi = 500,
     width = 8,
     height = 8
   )
@@ -145,12 +144,12 @@ annot_p_save <- round(annot_df$p_sample_save[[1]], 2)
 annot_n_save <- signif(annot_n * annot_p_save, digits = 2)
 
 annot_label_early <- glue(
-  "At Nmax = {comma(annot_n)} and AMCE = {number(annot_df$amce[[1]], accuracy = 0.01)},\n",
+  "Nmax = {comma(annot_n)}; AMCE = {number(annot_df$amce[[1]], accuracy = 0.01)}\n",
   "Pr(early stopping) = {percent(annot_p_early, accuracy = 1)}"
 )
 
 annot_label_save <- glue(
-  "Nmax = {comma(annot_n)}, AMCE = {number(annot_df$amce[[1]], accuracy = 0.01)}\n",
+  "Nmax = {comma(annot_n)}; AMCE = {number(annot_df$amce[[1]], accuracy = 0.01)}\n",
   "Mean sample saved = {percent(annot_p_save, accuracy = 1)}\n",
   "(about {comma(annot_n_save)} observations)"
 )
@@ -280,10 +279,9 @@ suppressWarnings({
     plot_layout(ncol = 2, guides = "collect") &
     theme(legend.position = "bottom")
 
-  ggsave(
-    here("figures", "figure3.png"),
+  save_paper_figure(
+    "figure3.png",
     plot = sample_efficiency_plot,
-    dpi = 500,
     width = 9,
     height = 4
   )

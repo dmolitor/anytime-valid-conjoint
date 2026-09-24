@@ -237,8 +237,7 @@ save_paper_figure(
   "figure6.png",
   plot = asylum_estimates_plot,
   width = 6.5,
-  height = 11,
-  dpi = 500
+  height = 11
 )
 
 ## ----  Plot Figure 5 --------------------------------------------------------
@@ -302,6 +301,5 @@ save_paper_figure(
   "figure5.png",
   plot = eprocess_plot,
   width = 8,
-  height = 6,
-  dpi = 500
+  height = 6
 )
