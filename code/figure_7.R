@@ -13,7 +13,8 @@ results <- read_csv(here("data", "figure7.csv"), show_col_types = FALSE) |>
     Test = case_when(
       Test == "Multivariate region null" ~ "Multivariate null",
       TRUE ~ "Scalar null"
-    )
+    ),
+    Test = factor(Test, levels = c("Scalar null", "Multivariate null"))
   )
 
 p <- ggplot(results, aes(x = G, y = p_false_positive, color = Method, fill = Method)) +
